@@ -17,7 +17,7 @@ AWS_ENV_SCRIPT="${AWS_ENV_SCRIPT:-$HOME/bin/redhat-aws.sh}"
 die() { echo "ERROR: $*" >&2; exit 1; }
 
 # sanity checks
-command -v openshift-install >/dev/null 2>&1 || die "openshift-install not found in PATH"
+command -v openshift-install-4.19 >/dev/null 2>&1 || die "openshift-install-4.19 not found in PATH"
 command -v aws >/dev/null 2>&1 || die "aws cli not found in PATH"
 [[ -f "$AWS_ENV_SCRIPT" ]] || die "aws env script not found at $AWS_ENV_SCRIPT"
 [[ -f "$PULL_SECRET_PATH" ]] || die "pull secret not found at $PULL_SECRET_PATH"
@@ -99,5 +99,5 @@ PY
 # keep a backup (installer consumes install-config.yaml)
 cp "$OCP_ASSET_DIR/install-config.yaml" "$OCP_ASSET_DIR/install-config.backup.yaml"
 
-echo "==> launching openshift-install with dir=$OCP_ASSET_DIR"
-openshift-install create cluster --dir "$OCP_ASSET_DIR" --log-level=info
+echo "==> launching openshift-install-4.19 with dir=$OCP_ASSET_DIR"
+openshift-install-4.19 create cluster --dir "$OCP_ASSET_DIR" --log-level=info
