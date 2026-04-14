@@ -11,6 +11,10 @@ die() { echo "ERROR: $*" >&2; exit 1; }
 command -v aws >/dev/null 2>&1 || die "aws cli not found in PATH"
 [[ -f "$AWS_ENV_SCRIPT" ]] || die "aws env script not found at $AWS_ENV_SCRIPT"
 
+# 1) source AWS profile setup
+# shellcheck source=/dev/null
+source "$AWS_ENV_SCRIPT"
+
 if [[ ! -d "$OCP_ASSET_DIR" ]]; then
     echo "Asset directory $OCP_ASSET_DIR not found. Nothing to destroy."
     exit 0
