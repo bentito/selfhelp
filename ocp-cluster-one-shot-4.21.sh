@@ -17,11 +17,49 @@ AWS_ENV_SCRIPT="${AWS_ENV_SCRIPT:-$HOME/bin/redhat-aws.sh}"
 die() { echo "ERROR: $*" >&2; exit 1; }
 
 # sanity checks
-command -v openshift-install-4.21 >/dev/null 2>&1 || die "openshift-install-4.21 not found in PATH"
 command -v aws >/dev/null 2>&1 || die "aws cli not found in PATH"
 [[ -f "$AWS_ENV_SCRIPT" ]] || die "aws env script not found at $AWS_ENV_SCRIPT"
 [[ -f "$PULL_SECRET_PATH" ]] || die "pull secret not found at $PULL_SECRET_PATH"
 [[ -f "$SSH_PUBKEY_PATH" ]] || die "ssh public key not found at $SSH_PUBKEY_PATH"
+
+ensure_installer() {
+    local VERSION="4.21.10"
+    local BIN_NAME="openshift-install-4.21"
+    local BIN_PATH="$HOME/bin/$BIN_NAME"
+    
+    if [[ -f "$BIN_PATH" ]]; then
+        return 0
+    fi
+
+    echo "==> $BIN_NAME not found, attempting to download version $VERSION..."
+    mkdir -p "$HOME/bin"
+    
+    local ARCH
+    ARCH=$(uname -m)
+    [[ "$ARCH" == "arm64" ]] || ARCH="x86_64"
+    
+    local OS="mac"
+    [[ "$(uname)" == "Darwin" ]] || OS="linux"
+    
+    # Map architecture for the mirror URLs
+    local MIRROR_ARCH="$ARCH"
+    [[ "$ARCH" == "x86_64" ]] && MIRROR_ARCH="x86_64"
+    [[ "$ARCH" == "arm64" ]] && MIRROR_ARCH="arm64"
+
+    local URL="https://mirror.openshift.com/pub/openshift-v4/$MIRROR_ARCH/clients/ocp/$VERSION/openshift-install-$OS-$ARCH.tar.gz"
+    if [[ "$OS" == "mac" && "$ARCH" == "x86_64" ]]; then
+        URL="https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/$VERSION/openshift-install-mac.tar.gz"
+    fi
+
+    echo "    Downloading from $URL"
+    curl -L -o "/tmp/$BIN_NAME.tar.gz" "$URL" || die "failed to download installer"
+    tar -xzf "/tmp/$BIN_NAME.tar.gz" -C /tmp openshift-install || die "failed to extract installer"
+    mv /tmp/openshift-install "$BIN_PATH"
+    chmod +x "$BIN_PATH"
+    echo "==> installed $BIN_NAME to $BIN_PATH"
+}
+
+ensure_installer
 
 # 1) source AWS profile setup (this will clear AWS_* env vars by design)
 # shellcheck source=/dev/null
