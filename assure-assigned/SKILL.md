@@ -20,17 +20,18 @@ This skill automates the synchronization of PR reviewer assignments from the tea
         ```
 
 3.  **Extract PR Assignments**:
-    *   Use the bundled Python script to find the most recent date heading and extract the PR links and reviewers:
+    *   Use the bundled Python script to chop the HTML document down to just the latest meeting table data, converted into a JSON structure:
         ```bash
         python3 scripts/parse_table.py /tmp/bug-scrub.html
         ```
-    *   This script will return a JSON object containing the date found and a list of `prs` (each with a `url` and a `reviewers` string).
+    *   This script returns a JSON object containing the `date` of the meeting notes and a `tables` array containing the parsed rows and cells. Each cell contains `text` and an optional `href`.
 
-4.  **Sync to GitHub**:
-    *   For each PR returned in the JSON array:
+4.  **Analyze and Sync to GitHub**:
+    *   Analyze the JSON table output to identify rows representing GitHub Pull Requests. You will typically find the PR link in the first column and the assigned reviewer(s) in the third column. Ignore non-GitHub URLs.
+    *   For each identified GitHub PR:
         1.  Parse the repository `owner`, `repo` name, and `issue_number` from the GitHub URL.
         2.  Map the reviewer name(s) to GitHub username(s) using the `config.json` data. Make sure to handle multiple names in a single string (e.g., "Davide, Joao" or "Brett Tofel Davide Salerno").
-        3.  Use the `mcp_github_issue_write` tool with `method: "update"` and the PR number as `issue_number` to set the `assignees` field.
+        3.  Use the `mcp_github_issue_write` tool with `method: "update"` to set the `assignees` field. **You MUST provide the `owner` and `repo` parameters** along with the `issue_number`.
 
 ## Implementation Details
 
