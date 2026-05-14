@@ -31,7 +31,7 @@ This skill automates the synchronization of PR reviewer assignments from the tea
     *   For each identified GitHub PR:
         1.  Parse the repository `owner`, `repo` name, and `issue_number` from the GitHub URL.
         2.  Map the reviewer name(s) to GitHub username(s) using the `config.json` data. Make sure to handle multiple names in a single string (e.g., "Davide, Joao" or "Brett Tofel Davide Salerno").
-        3.  Use the `mcp_github_issue_write` tool with `method: "update"` to set the `assignees` field. **You MUST provide the `owner` and `repo` parameters** along with the `issue_number`.
+        3.  Use the `run_shell_command` tool to comment on the PR using the GitHub CLI to trigger assignment via Prow: `gh pr comment <PR_URL> --body "/assign @<username1> @<username2>"`
 
 ## Implementation Details
 
