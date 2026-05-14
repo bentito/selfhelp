@@ -2,11 +2,10 @@
 # shellcheck disable=SC2034
 
 # --- settings ---
-# Account: NIDS Team AWS Dev (<your-aws-account-id>)
+# Account: NIDS Team AWS Dev (Account ID provided via AWS_ACCOUNT_ID env var)
 PROFILE="${PROFILE:-nids-dev}"
 REGION="${REGION:-us-east-1}"
 KERBEROS_ID="${KERBEROS_ID:-$USER}"
-SAML_ACCOUNT_ID="<your-aws-account-id>"
 SAML_ROLE_NAME="admin"
 VENV_PATH="$(dirname "${BASH_SOURCE[0]}")/.aws-saml-venv"
 # -----------------
@@ -16,6 +15,13 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
   echo "ERROR: this script must be sourced, not run directly."
   echo "Usage: source $0"
   exit 1
+fi
+
+if [[ -z "${AWS_ACCOUNT_ID:-}" ]]; then
+    echo "ERROR: AWS_ACCOUNT_ID environment variable is not set." >&2
+    echo "       Please ask the NIDS team for the AWS Account ID on Slack and export it:" >&2
+    echo "       export AWS_ACCOUNT_ID=\"<account_id>\"" >&2
+    return 1
 fi
 
 echo "==> clearing AWS_* env vars in this shell"
@@ -47,7 +53,7 @@ if ! aws sts get-caller-identity >/dev/null 2>&1; then
     # but we pre-specify account/role to minimize friction.
     (
         source "$VENV_PATH/bin/activate"
-        aws-saml.py --target-account "$SAML_ACCOUNT_ID" \
+        aws-saml.py --target-account "$AWS_ACCOUNT_ID" \
                     --target-role "$SAML_ROLE_NAME" \
                     --profile "$AWS_PROFILE"
     )

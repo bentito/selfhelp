@@ -30,10 +30,13 @@ Run the setup script provided in this repository. It will verify your prerequisi
 
 The `ocp-cluster-one-shot-4.21.sh` script handles everything automatically, including AWS authentication. 
 
-By default, the script assumes your Kerberos ID is the same as your local system `$USER`. If your Red Hat Kerberos ID is different from your laptop username, export it first:
+By default, the script assumes your Kerberos ID is the same as your local system `$USER`. It also requires the NIDS AWS Account ID to be explicitly set. 
+
+Please request the **NIDS Dev AWS Account ID** from a team member on Slack, and export it in your shell profile (e.g., `~/.zshrc` or `~/.bashrc`):
 
 ```bash
-export KERBEROS_ID="johndoe"
+export AWS_ACCOUNT_ID="<account_id_from_slack>"
+export KERBEROS_ID="johndoe" # Only needed if different from your laptop username
 ```
 
 ### Launching a Cluster
@@ -46,7 +49,7 @@ Simply run the one-shot script:
 
 **What happens under the hood:**
 1.  **Kerberos Authentication:** The script checks your Kerberos ticket. If you don't have an active ticket, it will prompt you for your Red Hat Kerberos password.
-2.  **SAML Federation:** It silently calls the `aws-saml.py` tool from the virtual environment, requests the `admin` role for the NIDS team AWS account (`<your-aws-account-id>`), and saves the temporary credentials.
+2.  **SAML Federation:** It silently calls the `aws-saml.py` tool from the virtual environment, requests the `admin` role for the NIDS team AWS account (using the `$AWS_ACCOUNT_ID` variable), and saves the temporary credentials.
 3.  **Cluster Deployment:** It creates a unique cluster name based on your `$USER` and the date, configures the OpenShift installer with `credentialsMode: Manual` (to accept the temporary SAML tokens), and starts the deployment.
 
 ### Tearing Down a Cluster
