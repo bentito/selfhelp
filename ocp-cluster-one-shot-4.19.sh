@@ -5,11 +5,11 @@ set -euo pipefail
 OCP_BASE_DOMAIN="${OCP_BASE_DOMAIN:-nids-dev.devcluster.openshift.com}"
 OCP_REGION="${OCP_REGION:-us-east-1}"
 OCP_ASSET_DIR="${OCP_ASSET_DIR:-/tmp/ocp1}"
-OCP_CLUSTER_NAME="${OCP_CLUSTER_NAME:-btofel-netedg-$(date +%y%m%d)}"
+OCP_CLUSTER_NAME="${OCP_CLUSTER_NAME:-${USER}-netedg-$(date +%y%m%d)}"
 
 # secrets/keys
-PULL_SECRET_PATH="${PULL_SECRET_PATH:-/Users/btofel/.ocp-installer-pull-secret}"
-SSH_PUBKEY_PATH="${SSH_PUBKEY_PATH:-/Users/btofel/.ssh/id_ed25519.pub}"
+PULL_SECRET_PATH="${PULL_SECRET_PATH:-$HOME/.ocp-installer-pull-secret}"
+SSH_PUBKEY_PATH="${SSH_PUBKEY_PATH:-$HOME/.ssh/id_ed25519.pub}"
 
 # aws environment bootstrapper
 AWS_ENV_SCRIPT="${AWS_ENV_SCRIPT:-$(dirname "$0")/redhat-aws.sh}"
@@ -74,7 +74,7 @@ aws sts get-caller-identity || die "failed to get caller identity"
 echo "==> performing aws networking sanity checks"
 
 # A) VPC Block Public Access (Fixes the "horribly wrong" account-level block)
-# This setting was likely changed during OCP 4.21 testing and blocks all IGW traffic.
+# This setting was likely changed during OCP testing and blocks all IGW traffic.
 BPA_MODE=$(aws ec2 describe-vpc-block-public-access-options --query 'VpcBlockPublicAccessOptions.InternetGatewayBlockMode' --output text 2>/dev/null || echo "off")
 if [[ "$BPA_MODE" != "off" ]]; then
     echo "WARNING: VPC Block Public Access is set to '$BPA_MODE' in $OCP_REGION."
@@ -113,6 +113,7 @@ metadata:
 platform:
   aws:
     region: __REGION__
+credentialsMode: Manual
 pullSecret: '__PULL_SECRET__'
 sshKey: '__SSH_PUBKEY__'
 YAML
