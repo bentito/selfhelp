@@ -5,11 +5,11 @@ set -euo pipefail
 OCP_BASE_DOMAIN="${OCP_BASE_DOMAIN:-nids-dev.devcluster.openshift.com}"
 OCP_REGION="${OCP_REGION:-us-east-1}"
 OCP_ASSET_DIR="${OCP_ASSET_DIR:-/tmp/ocp1}"
-OCP_CLUSTER_NAME="${OCP_CLUSTER_NAME:-btofel-netedg-$(date +%y%m%d)}"
+OCP_CLUSTER_NAME="${OCP_CLUSTER_NAME:-${USER}-netedg-$(date +%y%m%d)}"
 
 # secrets/keys
-PULL_SECRET_PATH="${PULL_SECRET_PATH:-/Users/btofel/.ocp-installer-pull-secret}"
-SSH_PUBKEY_PATH="${SSH_PUBKEY_PATH:-/Users/btofel/.ssh/id_ed25519.pub}"
+PULL_SECRET_PATH="${PULL_SECRET_PATH:-$HOME/.ocp-installer-pull-secret}"
+SSH_PUBKEY_PATH="${SSH_PUBKEY_PATH:-$HOME/.ssh/id_ed25519.pub}"
 
 # aws environment bootstrapper
 AWS_ENV_SCRIPT="${AWS_ENV_SCRIPT:-$(dirname "$0")/redhat-aws.sh}"

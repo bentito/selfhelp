@@ -5,10 +5,10 @@
 # Account: NIDS Team AWS Dev (<your-aws-account-id>)
 PROFILE="${PROFILE:-nids-dev}"
 REGION="${REGION:-us-east-1}"
-KERBEROS_ID="btofel"
+KERBEROS_ID="${KERBEROS_ID:-$USER}"
 SAML_ACCOUNT_ID="<your-aws-account-id>"
 SAML_ROLE_NAME="admin"
-VENV_PATH="/Users/btofel/workspace/selfhelp/.aws-saml-venv"
+VENV_PATH="$(dirname "${BASH_SOURCE[0]}")/.aws-saml-venv"
 # -----------------
 
 # must be sourced
@@ -38,6 +38,7 @@ if ! aws sts get-caller-identity >/dev/null 2>&1; then
     
     if [[ ! -d "$VENV_PATH" ]]; then
         echo "ERROR: SAML virtualenv not found at $VENV_PATH" >&2
+        echo "Please run ./setup.sh first to initialize the environment." >&2
         return 1
     fi
 
