@@ -59,45 +59,7 @@ ensure_installer() {
     echo "==> installed $BIN_NAME to $BIN_PATH"
 }
 
-ensure_ccoctl() {
-    local VERSION="4.21.10"
-    local BIN_NAME="ccoctl-4.21"
-    local BIN_PATH="$HOME/bin/$BIN_NAME"
-    
-    if [[ -f "$BIN_PATH" ]]; then
-        return 0
-    fi
-
-    echo "==> $BIN_NAME not found, attempting to download version $VERSION..."
-    mkdir -p "$HOME/bin"
-    
-    local ARCH
-    ARCH=$(uname -m)
-    [[ "$ARCH" == "arm64" ]] || ARCH="x86_64"
-    
-    local OS="mac"
-    [[ "$(uname)" == "Darwin" ]] || OS="linux"
-    
-    # Map architecture for the mirror URLs
-    local MIRROR_ARCH="$ARCH"
-    [[ "$ARCH" == "x86_64" ]] && MIRROR_ARCH="x86_64"
-    [[ "$ARCH" == "arm64" ]] && MIRROR_ARCH="arm64"
-
-    local URL="https://mirror.openshift.com/pub/openshift-v4/$MIRROR_ARCH/clients/ocp/$VERSION/ccoctl-$OS-$ARCH.tar.gz"
-    if [[ "$OS" == "mac" && "$ARCH" == "x86_64" ]]; then
-        URL="https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/$VERSION/ccoctl-mac.tar.gz"
-    fi
-
-    echo "    Downloading from $URL"
-    curl -L -o "/tmp/$BIN_NAME.tar.gz" "$URL" || die "failed to download ccoctl"
-    tar -xzf "/tmp/$BIN_NAME.tar.gz" -C /tmp ccoctl || die "failed to extract ccoctl"
-    mv /tmp/ccoctl "$BIN_PATH"
-    chmod +x "$BIN_PATH"
-    echo "==> installed $BIN_NAME to $BIN_PATH"
-}
-
 ensure_installer
-ensure_ccoctl
 
 # 1) source AWS profile setup (this will clear AWS_* env vars by design)
 # shellcheck source=/dev/null
