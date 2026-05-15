@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # --- settings (matching ocp-cluster-one-shot.sh defaults) ---
-OCP_ASSET_DIR="${OCP_ASSET_DIR:-/tmp/ocp1}"
+OCP_ASSET_DIR="${OCP_ASSET_DIR:-$(pwd)/ocp-install-dir}"
 AWS_ENV_SCRIPT="${AWS_ENV_SCRIPT:-$(dirname "$0")/redhat-aws.sh}"
 
 die() { echo "ERROR: $*" >&2; exit 1; }
