@@ -59,7 +59,45 @@ ensure_installer() {
     echo "==> installed $BIN_NAME to $BIN_PATH"
 }
 
+ensure_ccoctl() {
+    local VERSION="4.21.10"
+    local BIN_NAME="ccoctl-4.21"
+    local BIN_PATH="$HOME/bin/$BIN_NAME"
+    
+    if [[ -f "$BIN_PATH" ]]; then
+        return 0
+    fi
+
+    echo "==> $BIN_NAME not found, attempting to download version $VERSION..."
+    mkdir -p "$HOME/bin"
+    
+    local ARCH
+    ARCH=$(uname -m)
+    [[ "$ARCH" == "arm64" ]] || ARCH="x86_64"
+    
+    local OS="mac"
+    [[ "$(uname)" == "Darwin" ]] || OS="linux"
+    
+    # Map architecture for the mirror URLs
+    local MIRROR_ARCH="$ARCH"
+    [[ "$ARCH" == "x86_64" ]] && MIRROR_ARCH="x86_64"
+    [[ "$ARCH" == "arm64" ]] && MIRROR_ARCH="arm64"
+
+    local URL="https://mirror.openshift.com/pub/openshift-v4/$MIRROR_ARCH/clients/ocp/$VERSION/ccoctl-$OS-$ARCH.tar.gz"
+    if [[ "$OS" == "mac" && "$ARCH" == "x86_64" ]]; then
+        URL="https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/$VERSION/ccoctl-mac.tar.gz"
+    fi
+
+    echo "    Downloading from $URL"
+    curl -L -o "/tmp/$BIN_NAME.tar.gz" "$URL" || die "failed to download ccoctl"
+    tar -xzf "/tmp/$BIN_NAME.tar.gz" -C /tmp ccoctl || die "failed to extract ccoctl"
+    mv /tmp/ccoctl "$BIN_PATH"
+    chmod +x "$BIN_PATH"
+    echo "==> installed $BIN_NAME to $BIN_PATH"
+}
+
 ensure_installer
+ensure_ccoctl
 
 # 1) source AWS profile setup (this will clear AWS_* env vars by design)
 # shellcheck source=/dev/null
@@ -138,5 +176,38 @@ PY
 # keep a backup (installer consumes install-config.yaml)
 cp "$OCP_ASSET_DIR/install-config.yaml" "$OCP_ASSET_DIR/install-config.backup.yaml"
 
-echo "==> launching openshift-install-4.21 with dir=$OCP_ASSET_DIR"
+echo "==> creating manifests (phase 1) in $OCP_ASSET_DIR"
+openshift-install-4.21 create manifests --dir "$OCP_ASSET_DIR" --log-level=info
+
+echo "==> extracting CredentialsRequest manifests for ccoctl"
+CRED_REQ_DIR="$OCP_ASSET_DIR/credrequests"
+mkdir -p "$CRED_REQ_DIR"
+
+# Extract CredentialsRequests using the installer's native command
+openshift-install-4.21 create credrequests --dir "$OCP_ASSET_DIR" || die "failed to create credrequests"
+
+# Extract from the installer-generated manifests to the dedicated dir
+# Note: openshift-install create credrequests usually dumps them in the current dir or $OCP_ASSET_DIR
+# We move them to a clean dir for ccoctl
+find "$OCP_ASSET_DIR" -maxdepth 1 -name "*-credentials-request.yaml" -exec mv {} "$CRED_REQ_DIR/" \; || true
+find . -maxdepth 1 -name "*-credentials-request.yaml" -exec mv {} "$CRED_REQ_DIR/" \; || true
+
+# Check if we actually found any cred requests
+if [ -z "$(ls -A "$CRED_REQ_DIR" 2>/dev/null)" ]; then
+    echo "WARNING: No CredentialsRequest files found. This is unusual but we will try to proceed."
+else
+    echo "==> provisioning AWS IAM roles with ccoctl-4.21"
+    # ccoctl aws create-all creates the roles in AWS and generates the secrets manifests
+    ccoctl-4.21 aws create-all \
+        --name="$OCP_CLUSTER_NAME" \
+        --region="$OCP_REGION" \
+        --credentials-requests-dir="$CRED_REQ_DIR" \
+        --output-dir="$OCP_ASSET_DIR/ccoctl-output" || die "ccoctl provisioning failed"
+
+    echo "==> injecting ccoctl manifests into installer asset dir"
+    cp -r "$OCP_ASSET_DIR/ccoctl-output/manifests/"* "$OCP_ASSET_DIR/manifests/" || die "failed to inject ccoctl manifests"
+    cp -r "$OCP_ASSET_DIR/ccoctl-output/tls/"* "$OCP_ASSET_DIR/tls/" 2>/dev/null || true # Optional tls dir
+fi
+
+echo "==> launching openshift-install-4.21 create cluster (phase 2) with dir=$OCP_ASSET_DIR"
 openshift-install-4.21 create cluster --dir "$OCP_ASSET_DIR" --log-level=info
