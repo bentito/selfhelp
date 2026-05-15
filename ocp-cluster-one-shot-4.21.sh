@@ -5,8 +5,18 @@ set -euo pipefail
 OCP_BASE_DOMAIN="${OCP_BASE_DOMAIN:-nids-dev.devcluster.openshift.com}"
 OCP_REGION="${OCP_REGION:-us-west-2}"
 OCP_ASSET_DIR="${OCP_ASSET_DIR:-$(pwd)/ocp-install-dir}"
-UNIQUE_SUFFIX=$(head -c 4 /dev/urandom | xxd -p | tr -dc 'a-f0-9' | head -c 4)
-OCP_CLUSTER_NAME="${OCP_CLUSTER_NAME:-${USER}-netedg-$(date +%y%m%d)-${UNIQUE_SUFFIX}}"
+# Ensure unique sequential name
+COUNTER_FILE="$HOME/.ocp_cluster_counter"
+if [[ ! -f "$COUNTER_FILE" ]]; then
+    echo "1" > "$COUNTER_FILE"
+fi
+COUNTER=$(cat "$COUNTER_FILE")
+echo "$((COUNTER + 1))" > "$COUNTER_FILE"
+
+# Limit name to 21 chars: USER(max 8) + - + date(6) + - + counter
+SAFE_USER=$(echo "$USER" | cut -c 1-8)
+CURRENT_DATE=$(date +%y%m%d)
+OCP_CLUSTER_NAME="${OCP_CLUSTER_NAME:-${SAFE_USER}-${CURRENT_DATE}-${COUNTER}}"
 
 # secrets/keys
 PULL_SECRET_PATH="${PULL_SECRET_PATH:-$HOME/.ocp-installer-pull-secret}"
