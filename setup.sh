@@ -36,7 +36,7 @@ if [[ ! -f "$HOME/.ssh/id_ed25519.pub" && ! -f "$HOME/.ssh/id_rsa.pub" ]]; then
 fi
 
 # 4. Setup Python Virtual Environment
-VENV_PATH="$(dirname "$0")/.aws-saml-venv"
+VENV_PATH="${VENV_PATH:-$HOME/.aws-saml-venv}"
 
 if [[ ! -d "$VENV_PATH" ]]; then
     echo "==> Creating Python virtual environment in $VENV_PATH..."
