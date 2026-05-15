@@ -5,7 +5,8 @@ set -euo pipefail
 OCP_BASE_DOMAIN="${OCP_BASE_DOMAIN:-nids-dev.devcluster.openshift.com}"
 OCP_REGION="${OCP_REGION:-us-west-2}"
 OCP_ASSET_DIR="${OCP_ASSET_DIR:-$(pwd)/ocp-install-dir}"
-OCP_CLUSTER_NAME="${OCP_CLUSTER_NAME:-${USER}-netedg-$(date +%y%m%d)}"
+UNIQUE_SUFFIX=$(head -c 4 /dev/urandom | xxd -p | tr -dc 'a-f0-9' | head -c 4)
+OCP_CLUSTER_NAME="${OCP_CLUSTER_NAME:-${USER}-netedg-$(date +%y%m%d)-${UNIQUE_SUFFIX}}"
 
 # secrets/keys
 PULL_SECRET_PATH="${PULL_SECRET_PATH:-$HOME/.ocp-installer-pull-secret}"
