@@ -3,7 +3,7 @@ set -euo pipefail
 
 # --- user-tunable settings (use OCP_* to avoid clashes with AWS_* cleanup) ---
 OCP_BASE_DOMAIN="${OCP_BASE_DOMAIN:-nids-dev.devcluster.openshift.com}"
-OCP_REGION="${OCP_REGION:-us-east-1}"
+OCP_REGION="${OCP_REGION:-us-west-2}"
 OCP_ASSET_DIR="${OCP_ASSET_DIR:-$(pwd)/ocp-install-dir}"
 OCP_CLUSTER_NAME="${OCP_CLUSTER_NAME:-${USER}-netedg-$(date +%y%m%d)}"
 

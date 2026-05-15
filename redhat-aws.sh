@@ -4,7 +4,7 @@
 # --- settings ---
 # Account: NIDS Team AWS Dev (Account ID provided via AWS_ACCOUNT_ID env var)
 PROFILE="${PROFILE:-nids-dev}"
-REGION="${REGION:-us-east-1}"
+REGION="${REGION:-us-west-2}"
 KERBEROS_ID="${KERBEROS_ID:-$USER}"
 SAML_ROLE_NAME="admin"
 VENV_PATH="$(dirname "${BASH_SOURCE[0]}")/.aws-saml-venv"
