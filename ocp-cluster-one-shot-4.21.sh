@@ -18,6 +18,10 @@ SAFE_USER=$(echo "$USER" | cut -c 1-8)
 CURRENT_DATE=$(date +%y%m%d)
 OCP_CLUSTER_NAME="${OCP_CLUSTER_NAME:-${SAFE_USER}-${CURRENT_DATE}-${COUNTER}}"
 
+# 0) prep asset dir (clean slate)
+rm -rf "$OCP_ASSET_DIR"
+mkdir -p "$OCP_ASSET_DIR"
+
 # secrets/keys
 PULL_SECRET_PATH="${PULL_SECRET_PATH:-$HOME/.ocp-installer-pull-secret}"
 SSH_PUBKEY_PATH="${SSH_PUBKEY_PATH:-$HOME/.ssh/id_ed25519.pub}"
@@ -107,10 +111,6 @@ if [[ "$ZONE_ID" != "None" && "$ZONE_ID" != "null" ]]; then
 else
     echo "WARNING: Could not find Route53 zone for $OCP_BASE_DOMAIN. DNS verification may fail."
 fi
-
-# 2) prep asset dir
-rm -rf "$OCP_ASSET_DIR"
-mkdir -p "$OCP_ASSET_DIR"
 
 # 3) compose install-config.yaml
 PULL_SECRET_CONTENT="$(cat "$PULL_SECRET_PATH")"
