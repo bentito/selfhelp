@@ -24,7 +24,7 @@ Run the setup script provided in this repository. It will verify your prerequisi
 ./setup.sh
 ```
 
-*(Note: The setup script bypasses SSL verification internally during the pip installation because corporate GitLab instances often use self-signed certificates).*
+*(Note: The setup script bypasses SSL verification internally during the pip installation because Red Hat's internal GitLab instance uses self-signed certificates).*
 
 ## 3. Configuration & Usage
 
@@ -48,9 +48,12 @@ Simply run the one-shot script:
 ```
 
 **What happens under the hood:**
-1.  **Kerberos Authentication:** The script checks your Kerberos ticket. If you don't have an active ticket, it will prompt you for your Red Hat Kerberos password.
-2.  **SAML Federation:** It silently calls the `aws-saml.py` tool from the virtual environment, requests the `admin` role for the NIDS team AWS account (using the `$AWS_ACCOUNT_ID` variable), and saves the temporary credentials.
-3.  **Cluster Deployment:** It creates a unique cluster name based on your `$USER` and the date, configures the OpenShift installer with `credentialsMode: Manual` (to accept the temporary SAML tokens), and starts the deployment.
+1.  **Clean Slate:** The script wipes your local `ocp-install-dir` to ensure no stale state interferes with the new build.
+2.  **Kerberos Authentication:** The script checks your Kerberos ticket. If you don't have an active ticket, it will prompt you for your Red Hat Kerberos password.
+3.  **SAML Federation:** It silently calls the `aws-saml.py` tool from the virtual environment, requests the `admin` role for the NIDS team AWS account (using the `$AWS_ACCOUNT_ID` variable), and saves the temporary credentials.
+4.  **IAM Provisioning (ccoctl):** It uses Podman to run the OpenShift Cloud Credential Operator (`ccoctl`) against AWS. This creates the exact IAM roles the cluster needs to function in STS mode.
+5.  **Thumbprint Patching:** Because internal Red Hat proxies can alter certificate chains, AWS STS sometimes rejects the OIDC tokens. The script fetches the live SSL certificate fingerprint of your new AWS S3 bucket and automatically patches the IAM Provider to guarantee STS trust.
+6.  **Cluster Deployment:** It creates a unique cluster name based on your `$USER` and a local counter, configures the OpenShift installer with `credentialsMode: Manual`, injects the `ccoctl` secrets, and starts the deployment.
 
 ### Tearing Down a Cluster
 
