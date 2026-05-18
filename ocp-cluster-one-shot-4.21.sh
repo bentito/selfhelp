@@ -198,6 +198,27 @@ else
     echo "==> injecting ccoctl manifests into installer asset dir"
     cp -r "$OCP_ASSET_DIR/ccoctl-output/manifests/"* "$OCP_ASSET_DIR/manifests/" || die "failed to inject ccoctl manifests"
     cp -r "$OCP_ASSET_DIR/ccoctl-output/tls/"* "$OCP_ASSET_DIR/tls/" 2>/dev/null || true # Optional tls dir
+
+    echo "==> fixing IAM OIDC Thumbprint (Red Hat proxy workaround)"
+    # AWS STS needs the exact SHA1 fingerprint of the SSL certificate serving the S3 bucket.
+    # In some corporate environments, proxies or internal CAs alter the cert chain, causing STS to reject tokens.
+    # We fetch the *actual* fingerprint seen from the outside and update the OIDC provider.
+    S3_HOST="${OCP_CLUSTER_NAME}-oidc.s3.${OCP_REGION}.amazonaws.com"
+    OIDC_ARN="arn:aws:iam::$(aws sts get-caller-identity --query Account --output text --profile "$AWS_PROFILE"):oidc-provider/${S3_HOST}"
+    
+    echo "    Fetching certificate for $S3_HOST..."
+    ACTUAL_THUMBPRINT=$(echo -n | openssl s_client -connect "${S3_HOST}:443" -showcerts 2>/dev/null | openssl x509 -fingerprint -noout -sha1 | sed 's/.*=//' | tr -d ':' | tr '[:upper:]' '[:lower:]')
+    
+    if [[ -n "$ACTUAL_THUMBPRINT" ]]; then
+        echo "    Updating OIDC provider with thumbprint: $ACTUAL_THUMBPRINT"
+        # We also include the standard AWS S3 root thumbprint as a fallback
+        aws iam update-open-id-connect-provider-thumbprint \
+            --open-id-connect-provider-arn "$OIDC_ARN" \
+            --thumbprint-list "9e99a48a9960b14926bb7f3b02e22da2b0ab7280" "$ACTUAL_THUMBPRINT" \
+            --profile "$AWS_PROFILE" || echo "    WARNING: Failed to update OIDC thumbprint. Cluster may fail to boot."
+    else
+        echo "    WARNING: Could not fetch certificate fingerprint. Cluster may fail to boot."
+    fi
 fi
 
 echo "==> launching openshift-install-4.21 create cluster (phase 2) with dir=$OCP_ASSET_DIR"

@@ -149,5 +149,77 @@ PY
 # keep a backup (installer consumes install-config.yaml)
 cp "$OCP_ASSET_DIR/install-config.yaml" "$OCP_ASSET_DIR/install-config.backup.yaml"
 
-echo "==> launching openshift-install-4.19 with dir=$OCP_ASSET_DIR"
+echo "==> creating manifests (phase 1) in $OCP_ASSET_DIR"
+openshift-install-4.19 create manifests --dir "$OCP_ASSET_DIR" --log-level=info
+
+echo "==> extracting CredentialsRequest manifests for ccoctl"
+CRED_REQ_DIR="$OCP_ASSET_DIR/credrequests"
+mkdir -p "$CRED_REQ_DIR"
+
+# Extract CredentialsRequests using the oc CLI from the release payload
+oc adm release extract \
+    --credentials-requests \
+    --cloud=aws \
+    --to="$CRED_REQ_DIR" \
+    quay.io/openshift-release-dev/ocp-release:4.19.10-x86_64 || die "failed to extract credrequests via oc adm"
+
+# Check if we actually found any cred requests
+if [ -z "$(ls -A "$CRED_REQ_DIR" 2>/dev/null)" ]; then
+    echo "WARNING: No CredentialsRequest files found. This is unusual but we will try to proceed."
+else
+    echo "==> downloading ccoctl Linux binary for podman execution"
+    CCOCTL_LINUX_DIR="$HOME/.ccoctl-linux-bin"
+    mkdir -p "$CCOCTL_LINUX_DIR"
+    
+    if [[ ! -f "$CCOCTL_LINUX_DIR/ccoctl" ]]; then
+        curl -s -L -o "/tmp/ccoctl-linux.tar.gz" "https://mirror.openshift.com/pub/openshift-v4/arm64/clients/ocp/4.19.10/ccoctl-linux-4.19.10.tar.gz" || die "failed to download linux ccoctl"
+        tar -xzf "/tmp/ccoctl-linux.tar.gz" -C "$CCOCTL_LINUX_DIR" ccoctl || die "failed to extract linux ccoctl"
+    fi
+
+    echo "==> provisioning AWS IAM roles with ccoctl via podman"
+    
+    # We must pass the AWS credentials from our current SAML session into the podman container.
+    AWS_ACCESS_KEY_ID=$(aws configure get aws_access_key_id --profile "$AWS_PROFILE")
+    AWS_SECRET_ACCESS_KEY=$(aws configure get aws_secret_access_key --profile "$AWS_PROFILE")
+    AWS_SESSION_TOKEN=$(aws configure get aws_session_token --profile "$AWS_PROFILE")
+
+    # Run the extracted Linux ccoctl binary inside a standard ubuntu container (glibc required)
+    # We install ca-certificates first because ccoctl needs them to talk to AWS S3/IAM endpoints.
+    podman run --rm \
+        -v "$OCP_ASSET_DIR:/data:Z" \
+        -v "$CCOCTL_LINUX_DIR:/bin-mount:Z" \
+        -e AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID" \
+        -e AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY" \
+        -e AWS_SESSION_TOKEN="$AWS_SESSION_TOKEN" \
+        -e AWS_REGION="$OCP_REGION" \
+        docker.io/ubuntu:latest \
+        bash -c "apt-get update -qq && apt-get install -y -qq ca-certificates && /bin-mount/ccoctl aws create-all --name=\"$OCP_CLUSTER_NAME\" --region=\"$OCP_REGION\" --credentials-requests-dir=\"/data/credrequests\" --output-dir=\"/data/ccoctl-output\"" || die "ccoctl provisioning failed via podman"
+
+    echo "==> injecting ccoctl manifests into installer asset dir"
+    cp -r "$OCP_ASSET_DIR/ccoctl-output/manifests/"* "$OCP_ASSET_DIR/manifests/" || die "failed to inject ccoctl manifests"
+    cp -r "$OCP_ASSET_DIR/ccoctl-output/tls/"* "$OCP_ASSET_DIR/tls/" 2>/dev/null || true # Optional tls dir
+
+    echo "==> fixing IAM OIDC Thumbprint (Red Hat proxy workaround)"
+    # AWS STS needs the exact SHA1 fingerprint of the SSL certificate serving the S3 bucket.
+    # In some corporate environments, proxies or internal CAs alter the cert chain, causing STS to reject tokens.
+    # We fetch the *actual* fingerprint seen from the outside and update the OIDC provider.
+    S3_HOST="${OCP_CLUSTER_NAME}-oidc.s3.${OCP_REGION}.amazonaws.com"
+    OIDC_ARN="arn:aws:iam::$(aws sts get-caller-identity --query Account --output text --profile "$AWS_PROFILE"):oidc-provider/${S3_HOST}"
+    
+    echo "    Fetching certificate for $S3_HOST..."
+    ACTUAL_THUMBPRINT=$(echo -n | openssl s_client -connect "${S3_HOST}:443" -showcerts 2>/dev/null | openssl x509 -fingerprint -noout -sha1 | sed 's/.*=//' | tr -d ':' | tr '[:upper:]' '[:lower:]')
+    
+    if [[ -n "$ACTUAL_THUMBPRINT" ]]; then
+        echo "    Updating OIDC provider with thumbprint: $ACTUAL_THUMBPRINT"
+        # We also include the standard AWS S3 root thumbprint as a fallback
+        aws iam update-open-id-connect-provider-thumbprint \
+            --open-id-connect-provider-arn "$OIDC_ARN" \
+            --thumbprint-list "9e99a48a9960b14926bb7f3b02e22da2b0ab7280" "$ACTUAL_THUMBPRINT" \
+            --profile "$AWS_PROFILE" || echo "    WARNING: Failed to update OIDC thumbprint. Cluster may fail to boot."
+    else
+        echo "    WARNING: Could not fetch certificate fingerprint. Cluster may fail to boot."
+    fi
+fi
+
+echo "==> launching openshift-install-4.19 create cluster (phase 2) with dir=$OCP_ASSET_DIR"
 openshift-install-4.19 create cluster --dir "$OCP_ASSET_DIR" --log-level=info
