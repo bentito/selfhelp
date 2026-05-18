@@ -198,60 +198,6 @@ else
     echo "==> injecting ccoctl manifests into installer asset dir"
     cp -r "$OCP_ASSET_DIR/ccoctl-output/manifests/"* "$OCP_ASSET_DIR/manifests/" || die "failed to inject ccoctl manifests"
     cp -r "$OCP_ASSET_DIR/ccoctl-output/tls/"* "$OCP_ASSET_DIR/tls/" 2>/dev/null || true # Optional tls dir
-
-    echo "==> Polling AWS STS to ensure OIDC provider is ready (bypassing eventual consistency delays)"
-    
-    # We need to find one of the roles ccoctl just created to test against
-    TEST_ROLE_ARN=$(grep "role_arn" "$OCP_ASSET_DIR/manifests/openshift-image-registry-installer-cloud-credentials-credentials.yaml" | awk -F'= ' '{print $2}')
-    
-    if [[ -z "$TEST_ROLE_ARN" ]]; then
-        echo "WARNING: Could not extract a role ARN to test. Skipping STS readiness poll."
-    else
-        # Python script to test STS AssumeRoleWithWebIdentity
-        cat << 'EOF' > "$OCP_ASSET_DIR/sts-poll.py"
-import boto3
-import sys
-import os
-
-role_arn = sys.argv[1]
-region = os.environ.get('AWS_REGION', 'us-west-2')
-client = boto3.client('sts', region_name=region)
-
-try:
-    response = client.assume_role_with_web_identity(
-        RoleArn=role_arn,
-        RoleSessionName='test-session',
-        WebIdentityToken='eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3QifQ.eyJzdWIiOiJ0ZXN0IiwiYXVkIjoidGVzdCJ9.signature'
-    )
-except Exception as e:
-    error_msg = str(e)
-    # We EXPECT an InvalidIdentityToken error because our token is a fake JWT.
-    # What we are checking for is that STS successfully *tried* to validate it,
-    # meaning it successfully reached our S3 bucket and didn't throw a "Couldn't retrieve verification key" error.
-    if "InvalidIdentityToken" in error_msg and "Couldn't retrieve verification key" not in error_msg:
-        sys.exit(0) # Ready
-    else:
-        sys.exit(1) # Not Ready
-EOF
-        
-        MAX_RETRIES=30
-        RETRY_INTERVAL=10
-        READY=false
-        
-        for ((i=1; i<=MAX_RETRIES; i++)); do
-            if source "$VENV_PATH/bin/activate" && python "$OCP_ASSET_DIR/sts-poll.py" "$TEST_ROLE_ARN" >/dev/null 2>&1; then
-                echo "    [Success] AWS STS successfully reached the OIDC provider!"
-                READY=true
-                break
-            fi
-            echo "    [Attempt $i/$MAX_RETRIES] STS not yet ready. Waiting ${RETRY_INTERVAL}s for S3/IAM propagation..."
-            sleep $RETRY_INTERVAL
-        done
-        
-        if [ "$READY" = false ]; then
-            echo "    [WARNING] STS OIDC provider did not become ready within 5 minutes. Cluster installation may fail."
-        fi
-    fi
 fi
 
 echo "==> launching openshift-install-4.21 create cluster (phase 2) with dir=$OCP_ASSET_DIR"
