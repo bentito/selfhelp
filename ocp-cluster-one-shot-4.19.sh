@@ -198,6 +198,28 @@ else
     echo "==> injecting ccoctl manifests into installer asset dir"
     cp -r "$OCP_ASSET_DIR/ccoctl-output/manifests/"* "$OCP_ASSET_DIR/manifests/" || die "failed to inject ccoctl manifests"
     cp -r "$OCP_ASSET_DIR/ccoctl-output/tls/"* "$OCP_ASSET_DIR/tls/" 2>/dev/null || true # Optional tls dir
+
+    echo "==> fixing IAM OIDC Thumbprint (AWS Root CA mismatch)"
+    # AWS STS needs the exact SHA1 fingerprint of the Root CA serving the S3 bucket.
+    # ccoctl injects a legacy Starfield thumbprint, but us-west-2 uses Amazon Root CA 1.
+    # We fetch the *actual* fingerprint of the Root CA seen from the outside and update the OIDC provider.
+    S3_HOST="${OCP_CLUSTER_NAME}-oidc.s3.${OCP_REGION}.amazonaws.com"
+    OIDC_ARN="arn:aws:iam::$(aws sts get-caller-identity --query Account --output text --profile "$AWS_PROFILE"):oidc-provider/${S3_HOST}"
+    
+    echo "    Fetching root certificate for $S3_HOST..."
+    # Grab the full chain, extract the top-level root cert, and hash it
+    ACTUAL_THUMBPRINT=$(echo -n | openssl s_client -connect "${S3_HOST}:443" -showcerts 2>/dev/null | awk '/BEGIN CERTIFICATE/,/END CERTIFICATE/ {print}' | awk -v RS="-----END CERTIFICATE-----" 'NR==2 {print $0 RS}' | openssl x509 -fingerprint -noout -sha1 2>/dev/null | sed 's/.*=//' | tr -d ':' | tr '[:upper:]' '[:lower:]')
+    
+    if [[ -n "$ACTUAL_THUMBPRINT" ]]; then
+        echo "    Updating OIDC provider with thumbprint: $ACTUAL_THUMBPRINT"
+        # We include the standard legacy thumbprint and the actual detected root thumbprint
+        aws iam update-open-id-connect-provider-thumbprint \
+            --open-id-connect-provider-arn "$OIDC_ARN" \
+            --thumbprint-list "06b25927c42a721631c1efd9431e648fa62e1e39" "$ACTUAL_THUMBPRINT" \
+            --profile "$AWS_PROFILE" >/dev/null 2>&1 || echo "    WARNING: Failed to update OIDC thumbprint. Cluster may fail to boot."
+    else
+        echo "    WARNING: Could not fetch certificate fingerprint. Cluster may fail to boot."
+    fi
 fi
 
 echo "==> launching openshift-install-4.19 create cluster (phase 2) with dir=$OCP_ASSET_DIR"
