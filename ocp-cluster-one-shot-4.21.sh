@@ -199,25 +199,58 @@ else
     cp -r "$OCP_ASSET_DIR/ccoctl-output/manifests/"* "$OCP_ASSET_DIR/manifests/" || die "failed to inject ccoctl manifests"
     cp -r "$OCP_ASSET_DIR/ccoctl-output/tls/"* "$OCP_ASSET_DIR/tls/" 2>/dev/null || true # Optional tls dir
 
-    echo "==> fixing IAM OIDC Thumbprint (Red Hat proxy workaround)"
-    # AWS STS needs the exact SHA1 fingerprint of the SSL certificate serving the S3 bucket.
-    # In some corporate environments, proxies or internal CAs alter the cert chain, causing STS to reject tokens.
-    # We fetch the *actual* fingerprint seen from the outside and update the OIDC provider.
-    S3_HOST="${OCP_CLUSTER_NAME}-oidc.s3.${OCP_REGION}.amazonaws.com"
-    OIDC_ARN="arn:aws:iam::$(aws sts get-caller-identity --query Account --output text --profile "$AWS_PROFILE"):oidc-provider/${S3_HOST}"
+    echo "==> Polling AWS STS to ensure OIDC provider is ready (bypassing eventual consistency delays)"
     
-    echo "    Fetching certificate for $S3_HOST..."
-    ACTUAL_THUMBPRINT=$(echo -n | openssl s_client -connect "${S3_HOST}:443" -showcerts 2>/dev/null | openssl x509 -fingerprint -noout -sha1 | sed 's/.*=//' | tr -d ':' | tr '[:upper:]' '[:lower:]')
+    # We need to find one of the roles ccoctl just created to test against
+    TEST_ROLE_ARN=$(grep "role_arn" "$OCP_ASSET_DIR/manifests/openshift-image-registry-installer-cloud-credentials-credentials.yaml" | awk -F'= ' '{print $2}')
     
-    if [[ -n "$ACTUAL_THUMBPRINT" ]]; then
-        echo "    Updating OIDC provider with thumbprint: $ACTUAL_THUMBPRINT"
-        # We also include the standard AWS S3 root thumbprint as a fallback
-        aws iam update-open-id-connect-provider-thumbprint \
-            --open-id-connect-provider-arn "$OIDC_ARN" \
-            --thumbprint-list "9e99a48a9960b14926bb7f3b02e22da2b0ab7280" "$ACTUAL_THUMBPRINT" \
-            --profile "$AWS_PROFILE" || echo "    WARNING: Failed to update OIDC thumbprint. Cluster may fail to boot."
+    if [[ -z "$TEST_ROLE_ARN" ]]; then
+        echo "WARNING: Could not extract a role ARN to test. Skipping STS readiness poll."
     else
-        echo "    WARNING: Could not fetch certificate fingerprint. Cluster may fail to boot."
+        # Python script to test STS AssumeRoleWithWebIdentity
+        cat << 'EOF' > "$OCP_ASSET_DIR/sts-poll.py"
+import boto3
+import sys
+import os
+
+role_arn = sys.argv[1]
+region = os.environ.get('AWS_REGION', 'us-west-2')
+client = boto3.client('sts', region_name=region)
+
+try:
+    response = client.assume_role_with_web_identity(
+        RoleArn=role_arn,
+        RoleSessionName='test-session',
+        WebIdentityToken='eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3QifQ.eyJzdWIiOiJ0ZXN0IiwiYXVkIjoidGVzdCJ9.signature'
+    )
+except Exception as e:
+    error_msg = str(e)
+    # We EXPECT an InvalidIdentityToken error because our token is a fake JWT.
+    # What we are checking for is that STS successfully *tried* to validate it,
+    # meaning it successfully reached our S3 bucket and didn't throw a "Couldn't retrieve verification key" error.
+    if "InvalidIdentityToken" in error_msg and "Couldn't retrieve verification key" not in error_msg:
+        sys.exit(0) # Ready
+    else:
+        sys.exit(1) # Not Ready
+EOF
+        
+        MAX_RETRIES=30
+        RETRY_INTERVAL=10
+        READY=false
+        
+        for ((i=1; i<=MAX_RETRIES; i++)); do
+            if source "$VENV_PATH/bin/activate" && python "$OCP_ASSET_DIR/sts-poll.py" "$TEST_ROLE_ARN" >/dev/null 2>&1; then
+                echo "    [Success] AWS STS successfully reached the OIDC provider!"
+                READY=true
+                break
+            fi
+            echo "    [Attempt $i/$MAX_RETRIES] STS not yet ready. Waiting ${RETRY_INTERVAL}s for S3/IAM propagation..."
+            sleep $RETRY_INTERVAL
+        done
+        
+        if [ "$READY" = false ]; then
+            echo "    [WARNING] STS OIDC provider did not become ready within 5 minutes. Cluster installation may fail."
+        fi
     fi
 fi
 
