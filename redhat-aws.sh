@@ -55,6 +55,7 @@ if ! aws sts get-caller-identity >/dev/null 2>&1; then
         source "$VENV_PATH/bin/activate"
         aws-saml.py --target-account "$AWS_ACCOUNT_ID" \
                     --target-role "$SAML_ROLE_NAME" \
+                    --session-duration 14400 \
                     --profile "$AWS_PROFILE"
     )
 fi
