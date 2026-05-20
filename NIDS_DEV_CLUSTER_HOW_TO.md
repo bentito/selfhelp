@@ -15,6 +15,9 @@ Before running the automation scripts, ensure your laptop is ready:
     *   Save it exactly at: `~/.ocp-installer-pull-secret`
 *   **SSH Key:**
     *   Ensure you have a default SSH key generated. If you don't, run: `ssh-keygen -t ed25519`
+*   **Podman Time Synchronization:**
+    *   The AWS STS authentication process strictly requires accurate timestamps. If your laptop has recently slept or been suspended, the Podman VM's clock may drift, leading to `SignatureDoesNotMatch: Signature expired` errors during the IAM provisioning phase.
+    *   **To fix this, always run:** `podman machine stop && podman machine start` before your first cluster deployment of the day.
 
 ## 2. Bootstrapping the Environment
 
