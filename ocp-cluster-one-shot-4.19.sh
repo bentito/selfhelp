@@ -49,20 +49,16 @@ ensure_installer() {
     echo "==> $BIN_NAME not found, attempting to download version $VERSION..."
     mkdir -p "$HOME/bin"
     
-    local ARCH
-    ARCH=$(uname -m)
-    [[ "$ARCH" == "arm64" ]] || ARCH="x86_64"
-    
+    # We intentionally force x86_64 regardless of host architecture (e.g. Apple Silicon).
+    # This prevents the installer from defaulting to an ARM64 payload and AWS Graviton instances.
+    # macOS will run the x86_64 binary seamlessly via Rosetta 2.
+    local ARCH="x86_64"
     local OS="mac"
     [[ "$(uname)" == "Darwin" ]] || OS="linux"
     
-    # Map architecture for the mirror URLs
-    local MIRROR_ARCH="$ARCH"
-    [[ "$ARCH" == "x86_64" ]] && MIRROR_ARCH="x86_64"
-    [[ "$ARCH" == "arm64" ]] && MIRROR_ARCH="arm64"
-
-    local URL="https://mirror.openshift.com/pub/openshift-v4/$MIRROR_ARCH/clients/ocp/$VERSION/openshift-install-$OS-$ARCH.tar.gz"
-    if [[ "$OS" == "mac" && "$ARCH" == "x86_64" ]]; then
+    local URL="https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/$VERSION/openshift-install-$OS-$ARCH.tar.gz"
+    if [[ "$OS" == "mac" ]]; then
+        # The macOS x86_64 binary is just called openshift-install-mac.tar.gz
         URL="https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/$VERSION/openshift-install-mac.tar.gz"
     fi
 
