@@ -7,56 +7,57 @@ This guide explains how to bootstrap the OpenShift cluster deployment scripts on
 Before running the automation scripts, ensure your laptop is ready:
 
 *   **VPN Connection:** You must be connected to the Red Hat corporate VPN to access the internal GitLab repository and Kerberos endpoints.
-*   **System Dependencies:** You need `kinit` to request Kerberos tickets.
-    *   **Mac (Homebrew):** `brew install krb5 awscli`
-    *   **Linux (Fedora/RHEL):** `sudo dnf install krb5-devel python3-devel openldap-devel awscli`
+*   **System Dependencies:** 
+    *   **Podman:** This is the primary requirement. All other tools (AWS CLI, OpenShift binaries, Python) are bundled in a container.
+    *   **kinit:** Required on the host to request Kerberos tickets.
+        *   **Mac (Homebrew):** `brew install krb5 podman`
+        *   **Linux (Fedora/RHEL):** `sudo dnf install krb5-workstation podman`
 *   **OpenShift Pull Secret:**
     *   Download your pull secret from [console.redhat.com](https://console.redhat.com/openshift/install/pull-secret).
     *   Save it exactly at: `~/.ocp-installer-pull-secret`
 *   **SSH Key:**
     *   Ensure you have a default SSH key generated. If you don't, run: `ssh-keygen -t ed25519`
 *   **Podman Time Synchronization:**
-    *   The AWS STS authentication process strictly requires accurate timestamps. If your laptop has recently slept or been suspended, the Podman VM's clock may drift, leading to `SignatureDoesNotMatch: Signature expired` errors during the IAM provisioning phase.
+    *   The AWS STS authentication process strictly requires accurate timestamps. If your laptop has recently slept or been suspended, the Podman VM's clock may drift.
     *   **To fix this, always run:** `podman machine stop && podman machine start` before your first cluster deployment of the day.
 
 ## 2. Bootstrapping the Environment
 
-Run the setup script provided in this repository. It will verify your prerequisites, create an isolated Python virtual environment, and install the internal Red Hat `aws-automation` SAML tool.
+Run the setup script provided in this repository. It will verify your prerequisites and build the `nids-dev` Podman image.
 
 ```bash
 ./setup.sh
 ```
 
-*(Note: The setup script bypasses SSL verification internally during the pip installation because Red Hat's internal GitLab instance uses self-signed certificates).*
+*(Note: The setup script builds a RHEL 9 UBI container that includes all necessary CLI tools and the internal Red Hat `aws-automation` SAML tool).*
 
 ## 3. Configuration & Usage
 
-The `ocp-cluster-one-shot-4.21.sh` script handles everything automatically, including AWS authentication. 
-
-By default, the script assumes your Kerberos ID is the same as your local system `$USER`. It also requires the NIDS AWS Account ID to be explicitly set. 
-
-Please request the **NIDS Dev AWS Account ID** from a team member on Slack, and export it in your shell profile (e.g., `~/.zshrc` or `~/.bashrc`):
-
-```bash
-export AWS_ACCOUNT_ID="<account_id_from_slack>"
-export KERBEROS_ID="johndoe" # Only needed if different from your laptop username
-```
+The NIDS environment is fully automated. You can run the deployment scripts directly from your host machine; they will automatically detect the environment and re-execute themselves inside the Podman container if necessary.
 
 ### Launching a Cluster
 
-Simply run the one-shot script:
+Simply run the one-shot script for your desired OpenShift version:
 
 ```bash
 ./ocp-cluster-one-shot-4.21.sh
+# OR
+./ocp-cluster-one-shot-4.19.sh
 ```
 
-**What happens under the hood:**
-1.  **Clean Slate:** The script wipes your local `ocp-install-dir` to ensure no stale state interferes with the new build.
-2.  **Kerberos Authentication:** The script checks your Kerberos ticket. If you don't have an active ticket, it will prompt you for your Red Hat Kerberos password.
-3.  **SAML Federation:** It silently calls the `aws-saml.py` tool from the virtual environment, requests the `admin` role for the NIDS team AWS account (using the `$AWS_ACCOUNT_ID` variable), and saves the temporary credentials.
-4.  **IAM Provisioning (ccoctl):** It uses Podman to run the OpenShift Cloud Credential Operator (`ccoctl`) against AWS. This creates the exact IAM roles the cluster needs to function in STS mode.
-5.  **STS Polling:** Because AWS S3 and IAM can take several minutes to propagate globally, the OpenShift installer often fails if it attempts to boot immediately. The script automatically polls the AWS STS endpoint using a mock token, pausing the deployment until AWS confirms the OIDC Provider is fully reachable and active.
-6.  **Cluster Deployment:** It creates a unique cluster name based on your `$USER` and a local counter, configures the OpenShift installer with `credentialsMode: Manual`, injects the `ccoctl` secrets, and starts the deployment.
+**What happens:**
+1.  **Auto-Detection:** The script detects it is running on the host and calls `./nids-run.sh`.
+2.  **Container Entry:** The container starts, mounting your host's Kerberos ticket, AWS config, and SSH keys.
+3.  **AWS Authentication:** The script (now inside the container) uses the host's ticket to refresh AWS credentials via `aws-saml.py`.
+4.  **Provisioning & Deployment:** The script uses the pre-installed Linux binaries to provision IAM roles and launch the cluster.
+
+### Manual Container Shell
+
+If you need to run manual commands or debug, you can still enter the container shell directly:
+
+```bash
+./nids-run.sh
+```
 
 ### Tearing Down a Cluster
 

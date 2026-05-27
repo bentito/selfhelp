@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# --- Container Auto-Detection ---
+# If we are NOT in the container, re-exec via nids-run.sh
+if [[ ! -f /run/.containerenv && "${NIDS_CONTAINER:-}" != "true" ]]; then
+    echo "==> Host execution detected. Re-launching inside nids-dev container..."
+    exec "$(dirname "$0")/nids-run.sh" "$0" "$@"
+fi
+
 # --- user-tunable settings (use OCP_* to avoid clashes with AWS_* cleanup) ---
 OCP_BASE_DOMAIN="${OCP_BASE_DOMAIN:-nids-dev.devcluster.openshift.com}"
 OCP_REGION="${OCP_REGION:-us-west-2}"
@@ -234,5 +241,5 @@ else
     fi
 fi
 
-echo "==> launching openshift-install-4.21 create cluster (phase 2) with dir=$OCP_ASSET_DIR"
-openshift-install-4.21 create cluster --dir "$OCP_ASSET_DIR" --log-level=info
+echo "==> launching openshift-install create cluster (phase 2) with dir=$OCP_ASSET_DIR"
+openshift-install create cluster --dir "$OCP_ASSET_DIR" --log-level=info

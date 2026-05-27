@@ -35,32 +35,23 @@ if [[ ! -f "$HOME/.ssh/id_ed25519.pub" && ! -f "$HOME/.ssh/id_rsa.pub" ]]; then
     echo ""
 fi
 
-# 4. Setup Python Virtual Environment
-VENV_PATH="${VENV_PATH:-$HOME/.aws-saml-venv}"
-
-if [[ ! -d "$VENV_PATH" ]]; then
-    echo "==> Creating Python virtual environment in $VENV_PATH..."
-    python3 -m venv "$VENV_PATH"
-else
-    echo "==> Virtual environment already exists at $VENV_PATH."
+# 4. Build Podman Image
+IMAGE_NAME="nids-dev:latest"
+echo "==> Building Podman image $IMAGE_NAME..."
+echo "    (Note: This is also handled automatically by the one-shot scripts)"
+if ! command -v podman >/dev/null 2>&1; then
+    echo "ERROR: 'podman' not found. Please install Podman first."
+    exit 1
 fi
 
-# 5. Install aws-automation (SAML CLI tool)
-echo "==> Activating virtual environment and installing Red Hat aws-automation tools..."
-source "$VENV_PATH/bin/activate"
-
-pip install --upgrade pip
-
-# Note: GIT_SSL_NO_VERIFY is required for some RH environments where self-signed certs
-# are used on the internal GitLab instance.
-GIT_SSL_NO_VERIFY=true pip install --upgrade git+https://gitlab.cee.redhat.com/compute/aws-automation.git
+podman build -t "$IMAGE_NAME" -f nids-dev.Containerfile .
 
 echo "------------------------------------------------------------"
 echo "==> Setup Complete!"
-echo "You are ready to deploy. If your local system username does not match"
-echo "your Red Hat Kerberos ID, please export it before running the scripts:"
-echo "    export KERBEROS_ID=johndoe"
+echo "The NIDS development environment is containerized."
 echo ""
-echo "To launch a cluster, run:"
+echo "You can now run any deployment script directly from your host:"
 echo "    ./ocp-cluster-one-shot-4.21.sh"
+echo ""
+echo "Everything (Kerberos, Image Build, AWS SAML) is handled automatically."
 echo "------------------------------------------------------------"

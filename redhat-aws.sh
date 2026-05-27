@@ -36,29 +36,36 @@ if ! klist -s; then
     kinit "${KERBEROS_ID}@IPA.REDHAT.COM" || return 1
 fi
 
-# 2) Check if AWS token is valid
+# 2. Check if AWS token is valid
 export AWS_PROFILE="$PROFILE"
 echo "==> checking AWS session for profile: $AWS_PROFILE"
 if ! aws sts get-caller-identity >/dev/null 2>&1; then
     echo "==> session expired or not found. refreshing via aws-saml.py..."
-    
-    if [[ ! -d "$VENV_PATH" ]]; then
-        echo "ERROR: SAML virtualenv not found at $VENV_PATH" >&2
-        echo "Please run ./setup.sh first to initialize the environment." >&2
-        return 1
-    fi
 
-    # Run the SAML tool from the venv
-    # Note: aws-saml.py will prompt for role selection if multiple are found, 
-    # but we pre-specify account/role to minimize friction.
-    (
-        source "$VENV_PATH/bin/activate"
+    # Check if we are in the container or need the local venv
+    if command -v aws-saml.py >/dev/null 2>&1; then
+        # Container environment: use system aws-saml.py
         aws-saml.py --target-account "$AWS_ACCOUNT_ID" \
                     --target-role "$SAML_ROLE_NAME" \
                     --session-duration 14400 \
                     --profile "$AWS_PROFILE"
-    )
+    else
+        # Local environment (legacy support)
+        if [[ ! -d "$VENV_PATH" ]]; then
+            echo "ERROR: SAML virtualenv not found at $VENV_PATH" >&2
+            echo "Please run ./setup.sh first to initialize the environment." >&2
+            return 1
+        fi
+        (
+            source "$VENV_PATH/bin/activate"
+            aws-saml.py --target-account "$AWS_ACCOUNT_ID" \
+                        --target-role "$SAML_ROLE_NAME" \
+                        --session-duration 14400 \
+                        --profile "$AWS_PROFILE"
+        )
+    fi
 fi
+
 
 # helper that always ignores any stray AWS_* for the call
 aws_clean () {
