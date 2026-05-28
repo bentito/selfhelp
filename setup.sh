@@ -44,7 +44,7 @@ if ! command -v podman >/dev/null 2>&1; then
     exit 1
 fi
 
-podman build -t "$IMAGE_NAME" -f nids-dev.Containerfile .
+podman build --platform "linux/$(podman info --format '{{.Host.Arch}}')" -t "$IMAGE_NAME" -f nids-dev.Containerfile .
 
 echo "------------------------------------------------------------"
 echo "==> Setup Complete!"
