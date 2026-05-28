@@ -5,7 +5,8 @@ set -euo pipefail
 # If we are NOT in the container, re-exec via nids-run.sh
 if [[ ! -f /run/.containerenv && "${NIDS_CONTAINER:-}" != "true" ]]; then
     echo "==> Host execution detected. Re-launching inside nids-dev container..."
-    exec "$(dirname "$0")/nids-run.sh" "$0" "$@"
+    # We use ./basename to ensure the container looks in /workspace
+    exec "$(dirname "$0")/nids-run.sh" "./$(basename "$0")" "$@"
 fi
 
 # --- user-tunable settings (use OCP_* to avoid clashes with AWS_* cleanup) ---
@@ -50,6 +51,9 @@ command -v openshift-install >/dev/null 2>&1 || die "openshift-install not found
 # shellcheck source=/dev/null
 source "$AWS_ENV_SCRIPT"
 
+# Force x86_64 release payload (prevents ARM64 installer from defaulting to Graviton)
+export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="quay.io/openshift-release-dev/ocp-release:4.19.12-x86_64"
+
 echo "==> verifying aws profile in use"
 aws configure list || die "failed to read aws configuration"
 echo "==> identity check"
@@ -92,6 +96,10 @@ metadata:
 platform:
   aws:
     region: __REGION__
+controlPlane:
+  architecture: amd64
+compute:
+- architecture: amd64
 credentialsMode: Manual
 pullSecret: '__PULL_SECRET__'
 sshKey: '__SSH_PUBKEY__'
