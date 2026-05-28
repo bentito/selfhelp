@@ -14,7 +14,7 @@ OCP_BASE_DOMAIN="${OCP_BASE_DOMAIN:-nids-dev.devcluster.openshift.com}"
 OCP_REGION="${OCP_REGION:-us-west-2}"
 OCP_ASSET_DIR="${OCP_ASSET_DIR:-$(pwd)/ocp-install-dir}"
 # Ensure unique sequential name
-COUNTER_FILE="$HOME/.ocp_cluster_counter"
+COUNTER_FILE="/workspace/.ocp_cluster_counter"
 if [[ ! -f "$COUNTER_FILE" ]]; then
     echo "1" > "$COUNTER_FILE"
 fi
