@@ -99,7 +99,9 @@ platform:
 controlPlane:
   architecture: amd64
 compute:
-- architecture: amd64
+- name: worker
+  replicas: 3
+  architecture: amd64
 credentialsMode: Manual
 pullSecret: '__PULL_SECRET__'
 sshKey: '__SSH_PUBKEY__'
