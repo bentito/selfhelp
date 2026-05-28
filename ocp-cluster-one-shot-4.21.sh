@@ -27,6 +27,11 @@ CURRENT_DATE=$(date +%y%m%d)
 OCP_CLUSTER_NAME="${OCP_CLUSTER_NAME:-${SAFE_USER}-${CURRENT_DATE}-${COUNTER}}"
 
 # 0) prep asset dir (clean slate)
+if [[ -f "$OCP_ASSET_DIR/metadata.json" ]]; then
+    echo "==> Found existing cluster metadata in $OCP_ASSET_DIR."
+    echo "==> Running automated teardown to prevent orphaned AWS resources..."
+    "$(dirname "$0")/ocp-cluster-teardown.sh" || echo "    [WARNING] Teardown returned an error, proceeding with clean slate anyway..."
+fi
 rm -rf "$OCP_ASSET_DIR"
 mkdir -p "$OCP_ASSET_DIR"
 

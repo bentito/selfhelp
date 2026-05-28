@@ -8,7 +8,24 @@ IMAGE_NAME="nids-dev:latest"
 HOST_UID=$(id -u)
 KRB5_HOST_PATH="${HOME}/.krb5cc_nids"
 
-# 1. Ensure the Podman image exists
+# 1. Check for Podman VM clock drift (macOS/Windows)
+if podman machine list 2>/dev/null | grep -qi "running"; then
+    echo "==> Checking Podman VM clock synchronization..."
+    HOST_TIME=$(date +%s)
+    PODMAN_TIME=$(podman machine ssh date +%s 2>/dev/null || echo "$HOST_TIME")
+    DIFF=$(( HOST_TIME - PODMAN_TIME ))
+    DIFF=${DIFF#-} # absolute value
+    if (( DIFF > 120 )); then
+        echo "    [WARNING] Podman VM clock is out of sync by $DIFF seconds (likely due to sleep)."
+        echo "    Restarting Podman machine to prevent AWS Signature errors..."
+        podman machine stop
+        podman machine start
+    else
+        echo "    Clock is synced (diff: ${DIFF}s)."
+    fi
+fi
+
+# 2. Ensure the Podman image exists
 if ! podman image exists "$IMAGE_NAME"; then
     echo "==> Container image $IMAGE_NAME not found. Building..."
     podman build -t "$IMAGE_NAME" -f "$(dirname "$0")/nids-dev.Containerfile" "$(dirname "$0")"
