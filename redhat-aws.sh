@@ -31,9 +31,19 @@ unset -m 'AWS_*' 2>/dev/null || true
 
 # 1) Check Kerberos ticket
 echo "==> verifying Kerberos ticket..."
+KINIT_OPTS=""
+# Optional: look for a password file in project root or home to skip prompt
+PASSWD_FILE="${PWD}/.krb-passwd"
+[[ ! -f "$PASSWD_FILE" ]] && PASSWD_FILE="${HOME}/.krb-passwd"
+
+if [[ -f "$PASSWD_FILE" ]]; then
+    echo "    Using Kerberos password file: $PASSWD_FILE"
+    KINIT_OPTS="--password-file=$PASSWD_FILE"
+fi
+
 if ! klist -s; then
     echo "==> No active Kerberos ticket found. Please authenticate:"
-    kinit "${KERBEROS_ID}@IPA.REDHAT.COM" || return 1
+    kinit $KINIT_OPTS "${KERBEROS_ID}@IPA.REDHAT.COM" || return 1
 fi
 
 # 2. Check if AWS token is valid

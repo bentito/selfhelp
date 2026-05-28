@@ -35,6 +35,17 @@ Run the setup script provided in this repository. It will verify your prerequisi
 
 The NIDS environment is fully automated. You can run the deployment scripts directly from your host machine; they will automatically detect the environment and re-execute themselves inside the Podman container if necessary.
 
+### Optional: Password-less Kerberos (Automation)
+
+If you wish to avoid the interactive Kerberos password prompt, you can save your Red Hat password in a plain text file at `~/.krb-passwd`. 
+
+```bash
+echo "your_password" > ~/.krb-passwd
+chmod 600 ~/.krb-passwd
+```
+
+The deployment scripts will automatically detect this file and use it for authentication.
+
 ### Launching a Cluster
 
 Simply run the one-shot script for your desired OpenShift version:
