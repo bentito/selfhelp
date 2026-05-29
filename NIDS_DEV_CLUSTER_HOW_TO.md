@@ -37,7 +37,7 @@ The NIDS environment is fully automated. You can run the deployment scripts dire
 
 ### Optional: Password-less Kerberos (Automation)
 
-If you wish to avoid the interactive Kerberos password prompt, you can save your Red Hat password in a plain text file at `~/.krb-passwd`. 
+If you wish to avoid the interactive Kerberos password prompt, you can save the password in a plain text file at `~/.krb-passwd`. This can be dangerous, use with care.
 
 ```bash
 echo "your_password" > ~/.krb-passwd
