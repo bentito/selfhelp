@@ -8,20 +8,19 @@ IMAGE_NAME="nids-dev:latest"
 HOST_UID=$(id -u)
 KRB5_HOST_PATH="${HOME}/.krb5cc_nids"
 
-# 1. Check for Podman VM clock drift (macOS/Windows)
-if podman machine list 2>/dev/null | grep -qi "running"; then
-    echo "==> Checking Podman VM clock synchronization..."
+# 1. Ensure Podman VM is running and clock is synced (macOS/Windows)
+if podman machine list 2>/dev/null | grep -q "applehv\|wsl"; then
+    echo "==> Ensuring Podman VM is running and clock is synced..."
+    podman machine start 2>/dev/null || true
+    
     HOST_TIME=$(date +%s)
-    PODMAN_TIME=$(podman machine ssh date +%s 2>/dev/null || echo "$HOST_TIME")
+    PODMAN_TIME=$(podman machine ssh date +%s 2>/dev/null || echo "0")
     DIFF=$(( HOST_TIME - PODMAN_TIME ))
     DIFF=${DIFF#-} # absolute value
-    if (( DIFF > 120 )); then
-        echo "    [WARNING] Podman VM clock is out of sync by $DIFF seconds (likely due to sleep)."
-        echo "    Restarting Podman machine to prevent AWS Signature errors..."
-        podman machine stop
-        podman machine start
-    else
-        echo "    Clock is synced (diff: ${DIFF}s)."
+    if (( DIFF > 10 )); then
+        echo "    Syncing Podman VM clock (diff: ${DIFF}s)..."
+        # Forcibly step the clock to match the host, bypassing VPN/NTP issues
+        podman machine ssh sudo date -s "@$HOST_TIME" >/dev/null 2>&1 || true
     fi
 fi
 
