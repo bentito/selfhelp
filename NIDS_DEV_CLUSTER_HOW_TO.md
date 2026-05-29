@@ -46,6 +46,21 @@ chmod 600 ~/.krb-passwd
 
 The deployment scripts will automatically detect this file and use it for authentication.
 
+### Environment Variables
+
+The deployment scripts rely on several environment variables. You must export the required variables in your shell or add them to your `~/.bashrc` or `~/.zshrc`.
+
+**Required:**
+*   `AWS_ACCOUNT_ID`: The 12-digit AWS Account ID for the NIDS Team Dev account. Ask the team on Slack if you do not have this.
+
+**Optional Overrides (Defaults provided):**
+*   `OCP_REGION`: The AWS region to deploy into (Defaults to `us-west-2`).
+*   `OCP_BASE_DOMAIN`: The base Route53 domain for the cluster (Defaults to `nids-dev.devcluster.openshift.com`).
+*   `OCP_CLUSTER_NAME`: Override the auto-generated sequential cluster name.
+*   `KERBEROS_ID`: Your Red Hat Kerberos ID (Defaults to your system `$USER`).
+*   `AWS_PROFILE`: The local AWS profile name to configure (Defaults to `nids-dev`).
+*   `SAML_ROLE_NAME`: The AWS IAM role to request via SAML (Defaults to `admin`).
+
 ### Launching a Cluster
 
 Simply run the one-shot script for your desired OpenShift version:
