@@ -5,7 +5,8 @@ set -euo pipefail
 # If we are NOT in the container, re-exec via nids-run.sh
 if [[ ! -f /run/.containerenv && "${NIDS_CONTAINER:-}" != "true" ]]; then
     echo "==> Host execution detected. Re-launching inside nids-dev container..."
-    exec "$(dirname "$0")/nids-run.sh" "$0" "$@"
+    # We use ./basename to ensure the container looks in /workspace
+    exec "$(dirname "$0")/nids-run.sh" "./$(basename "$0")" "$@"
 fi
 
 # --- settings (matching ocp-cluster-one-shot.sh defaults) ---
