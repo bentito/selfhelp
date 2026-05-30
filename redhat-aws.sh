@@ -46,12 +46,20 @@ if ! klist -s; then
     kinit $KINIT_OPTS "${KERBEROS_ID}@IPA.REDHAT.COM" || return 1
 fi
 
-# 2. Check if AWS token is valid
+# 2. Check if AWS token is valid (or force refresh)
 export AWS_PROFILE="$PROFILE"
 echo "==> checking AWS session for profile: $AWS_PROFILE"
-if ! aws sts get-caller-identity >/dev/null 2>&1; then
+if [[ "${FRESH_SESSION:-}" == "true" ]]; then
+    echo "==> FRESH_SESSION requested. Forcing refresh via aws-saml.py..."
+    REFRESH_NEEDED=true
+elif ! aws sts get-caller-identity >/dev/null 2>&1; then
     echo "==> session expired or not found. refreshing via aws-saml.py..."
+    REFRESH_NEEDED=true
+else
+    REFRESH_NEEDED=false
+fi
 
+if [[ "$REFRESH_NEEDED" == "true" ]]; then
     # Check if we are in the container or need the local venv
     if command -v aws-saml.py >/dev/null 2>&1; then
         # Container environment: use system aws-saml.py

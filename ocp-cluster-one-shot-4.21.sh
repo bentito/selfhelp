@@ -54,6 +54,7 @@ command -v openshift-install >/dev/null 2>&1 || die "openshift-install not found
 
 # 1) source AWS profile setup
 # shellcheck source=/dev/null
+export FRESH_SESSION="true"
 source "$AWS_ENV_SCRIPT"
 
 # Force x86_64 release payload (prevents ARM64 installer from defaulting to Graviton)
