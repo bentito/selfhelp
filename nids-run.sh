@@ -9,18 +9,23 @@ HOST_UID=$(id -u)
 KRB5_HOST_PATH="${HOME}/.krb5cc_nids"
 
 # 1. Ensure Podman VM is running and clock is synced (macOS/Windows)
-if podman machine list 2>/dev/null | grep -q "applehv\|wsl"; then
+if podman machine list 2>/dev/null | grep -qE 'applehv|qemu|wsl|hyperv'; then
     echo "==> Ensuring Podman VM is running and clock is synced..."
     podman machine start 2>/dev/null || true
     
     HOST_TIME=$(date +%s)
+    # Use a shorter timeout and handle potential SSH failures
     PODMAN_TIME=$(podman machine ssh date +%s 2>/dev/null || echo "0")
-    DIFF=$(( HOST_TIME - PODMAN_TIME ))
-    DIFF=${DIFF#-} # absolute value
-    if (( DIFF > 10 )); then
-        echo "    Syncing Podman VM clock (diff: ${DIFF}s)..."
-        # Forcibly step the clock to match the host, bypassing VPN/NTP issues
-        podman machine ssh sudo date -s "@$HOST_TIME" >/dev/null 2>&1 || true
+    
+    # If PODMAN_TIME is 0, either the machine is still starting or SSH failed.
+    # We skip sync in that case to avoid setting time to 1970.
+    if [[ "$PODMAN_TIME" -gt 0 ]]; then
+        DIFF=$(( HOST_TIME - PODMAN_TIME ))
+        DIFF=${DIFF#-} # absolute value
+        if (( DIFF > 5 )); then
+            echo "    Syncing Podman VM clock (drift: ${DIFF}s)..."
+            podman machine ssh sudo date -s "@$HOST_TIME" >/dev/null 2>&1 || true
+        fi
     fi
 fi
 
