@@ -64,17 +64,21 @@ The deployment scripts rely on several environment variables. You must export th
 
 ### Launching a Cluster
 
-Simply run the one-shot script for your desired OpenShift version:
+Simply run the one-shot script. By default, it will deploy **OpenShift 4.21**.
 
 ```bash
-./ocp-cluster-one-shot-4.21.sh
-# OR
-./ocp-cluster-one-shot-4.19.sh
+./ocp-cluster-one-shot.sh
+```
+
+To deploy a specific version (e.g., **4.19**), pass it as the first argument:
+
+```bash
+./ocp-cluster-one-shot.sh 4.19
 ```
 
 **What happens:**
 1.  **Auto-Detection:** The script detects it is running on the host and calls `./nids-run.sh`.
-2.  **Container Entry:** The container starts, mounting your host's Kerberos ticket, AWS config, and SSH keys.
+2.  **Container Entry:** The container starts, mounting your host's Kerberos ticket, AWS config, and SSH keys. It also automatically ensures your Podman VM clock is synced to prevent AWS authentication errors.
 3.  **AWS Authentication:** The script (now inside the container) uses the host's ticket to refresh AWS credentials via `aws-saml.py`.
 4.  **Provisioning & Deployment:** The script uses the pre-installed Linux binaries to provision IAM roles and launch the cluster.
 

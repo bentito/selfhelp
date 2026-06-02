@@ -9,10 +9,37 @@ if [[ ! -f /run/.containerenv && "${NIDS_CONTAINER:-}" != "true" ]]; then
     exec "$(dirname "$0")/nids-run.sh" "./$(basename "$0")" "$@"
 fi
 
+# --- Version Selection ---
+# Default to 4.21 if no version is provided
+OCP_VERSION="${1:-4.21}"
+# Shift so any other potential args are preserved (though not currently used)
+[[ $# -gt 0 ]] && shift
+
+case "$OCP_VERSION" in
+    4.19)
+        RELEASE_IMAGE="quay.io/openshift-release-dev/ocp-release:4.19.12-x86_64"
+        ;;
+    4.21)
+        RELEASE_IMAGE="quay.io/openshift-release-dev/ocp-release:4.21.10-x86_64"
+        ;;
+    *)
+        # Handle full versions like 4.21.10
+        if [[ "$OCP_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+             RELEASE_IMAGE="quay.io/openshift-release-dev/ocp-release:${OCP_VERSION}-x86_64"
+        else
+             echo "ERROR: Unsupported version: $OCP_VERSION. Use '4.19', '4.21', or a full tag like '4.21.10'." >&2
+             exit 1
+        fi
+        ;;
+esac
+
+echo "==> Preparing to deploy OpenShift $OCP_VERSION using payload: $RELEASE_IMAGE"
+
 # --- user-tunable settings (use OCP_* to avoid clashes with AWS_* cleanup) ---
 OCP_BASE_DOMAIN="${OCP_BASE_DOMAIN:-nids-dev.devcluster.openshift.com}"
 OCP_REGION="${OCP_REGION:-us-west-2}"
 OCP_ASSET_DIR="${OCP_ASSET_DIR:-$(pwd)/ocp-install-dir}"
+
 # Ensure unique sequential name
 COUNTER_FILE="/workspace/.ocp_cluster_counter"
 if [[ ! -f "$COUNTER_FILE" ]]; then
@@ -58,7 +85,7 @@ export FRESH_SESSION="true"
 source "$AWS_ENV_SCRIPT"
 
 # Force x86_64 release payload (prevents ARM64 installer from defaulting to Graviton)
-export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="quay.io/openshift-release-dev/ocp-release:4.19.12-x86_64"
+export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="$RELEASE_IMAGE"
 
 echo "==> verifying aws profile in use"
 aws configure list || die "failed to read aws configuration"
@@ -144,7 +171,6 @@ mkdir -p "$OCP_ASSET_DIR/tls"
 cp "$OCP_ASSET_DIR/ccoctl-keys/serviceaccount-signer.private" "$OCP_ASSET_DIR/tls/bound-service-account-signing-key.key"
 
 echo "==> 2. creating manifests (phase 1) in $OCP_ASSET_DIR"
-# NOTE: We use 'openshift-install' which in the container points to the correct version
 openshift-install create manifests --dir "$OCP_ASSET_DIR" --log-level=info
 
 echo "==> 3. extracting CredentialsRequest manifests for ccoctl"
@@ -156,7 +182,7 @@ oc adm release extract \
     --credentials-requests \
     --cloud=aws \
     --to="$CRED_REQ_DIR" \
-    quay.io/openshift-release-dev/ocp-release:4.19.12-x86_64 || die "failed to extract credrequests via oc adm"
+    "$RELEASE_IMAGE" || die "failed to extract credrequests via oc adm"
 
 # Check if we actually found any cred requests
 if [ -z "$(ls -A "$CRED_REQ_DIR" 2>/dev/null)" ]; then
