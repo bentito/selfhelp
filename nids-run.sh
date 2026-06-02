@@ -62,13 +62,29 @@ fi
 
 # 4. Run the container
 
+# Linux-specific fixes for SELinux and file permissions
+EXTRA_FLAGS=""
+SELINUX_SUFFIX=""
+if [[ "$(uname)" == "Linux" ]]; then
+    # :z is a safe no-op on non-SELinux systems, but essential for Fedora/RHEL
+    SELINUX_SUFFIX=",z"
+    if [[ "$CONTAINER_ENGINE" == "podman" ]]; then
+        # Map host UID to container UID. Standard for Linux Podman.
+        EXTRA_FLAGS="--userns=keep-id"
+    else
+        # For Docker on Linux, we run as the current user to fix host file ownership
+        EXTRA_FLAGS="--user $(id -u):$(id -g)"
+    fi
+fi
+
 "$CONTAINER_ENGINE" run -it --rm \
+    $EXTRA_FLAGS \
     --name nids-dev-shell \
-    -v "$(pwd):/workspace:Z" \
-    -v "$HOME/.aws:/home/developer/.aws:Z" \
-    -v "$HOME/.ssh:/home/developer/.ssh:ro" \
-    -v "$HOME/.ocp-installer-pull-secret:/home/developer/.ocp-installer-pull-secret:ro" \
-    -v "${KRB5_HOST_PATH}:/tmp/krb5cc_1000:ro" \
+    -v "$(pwd):/workspace:z" \
+    -v "$HOME/.aws:/home/developer/.aws:z" \
+    -v "$HOME/.ssh:/home/developer/.ssh:ro${SELINUX_SUFFIX}" \
+    -v "$HOME/.ocp-installer-pull-secret:/home/developer/.ocp-installer-pull-secret:ro${SELINUX_SUFFIX}" \
+    -v "${KRB5_HOST_PATH}:/tmp/krb5cc_1000:ro${SELINUX_SUFFIX}" \
     -e NIDS_CONTAINER="true" \
     -e USER="${USER:-}" \
     -e AWS_ACCOUNT_ID="${AWS_ACCOUNT_ID:-}" \
