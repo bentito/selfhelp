@@ -10,31 +10,58 @@ HOST_UID=$(id -u)
 KRB5_HOST_PATH="${HOME}/.krb5cc_nids"
 
 # 1. Ensure Container VM is running and clock is synced (macOS/Windows)
-# This is currently Podman-specific.
 if [[ "$CONTAINER_ENGINE" == "podman" ]]; then
     if podman machine list 2>/dev/null | grep -qE 'applehv|qemu|wsl|hyperv'; then
         echo "==> Ensuring Podman VM is running and clock is synced..."
         podman machine start 2>/dev/null || true
         
-        HOST_TIME=$(date +%s)
-        # Use a shorter timeout and handle potential SSH failures
-        PODMAN_TIME=$(podman machine ssh date +%s 2>/dev/null || echo "0")
-        
-        # If PODMAN_TIME is 0, either the machine is still starting or SSH failed.
-        # We skip sync in that case to avoid setting time to 1970.
+        # Wait up to 10 seconds for the machine to be responsive to SSH
+        PODMAN_TIME="0"
+        for i in {1..10}; do
+            PODMAN_TIME=$(podman machine ssh date +%s 2>/dev/null || echo "0")
+            if [[ "$PODMAN_TIME" -gt 0 ]]; then break; fi
+            sleep 1
+        done
+
         if [[ "$PODMAN_TIME" -gt 0 ]]; then
+            HOST_TIME=$(date +%s)
             DIFF=$(( HOST_TIME - PODMAN_TIME ))
             DIFF=${DIFF#-} # absolute value
-            if (( DIFF > 5 )); then
+            if (( DIFF > 2 )); then
                 echo "    Syncing Podman VM clock (drift: ${DIFF}s)..."
                 podman machine ssh sudo date -s "@$HOST_TIME" >/dev/null 2>&1 || true
             fi
+        else
+            echo "    WARNING: Podman VM did not respond to SSH. Clock sync skipped."
+        fi
+    fi
+fi
+
+# 1.5. Host Clock Sanity Check
+# If the host clock is wildly off, AWS and TLS will fail even if the container matches the host.
+echo "==> Performing host clock sanity check..."
+HTTP_DATE=$(curl -sI --connect-timeout 2 https://google.com | grep -i "^date:" | sed 's/Date: //i' || echo "")
+if [[ -n "$HTTP_DATE" ]]; then
+    NETWORK_TIME=$(python3 -c "import email.utils; print(int(email.utils.mktime_tz(email.utils.parsedate_tz('''$HTTP_DATE'''))))" 2>/dev/null || echo "0")
+    if [[ "$NETWORK_TIME" -gt 0 ]]; then
+        HOST_TIME=$(date +%s)
+        HOST_DRIFT=$(( HOST_TIME - NETWORK_TIME ))
+        HOST_DRIFT=${HOST_DRIFT#-}
+        if (( HOST_DRIFT > 30 )); then
+            echo "************************************************************************"
+            echo " CRITICAL WARNING: YOUR HOST CLOCK IS OUT OF SYNC (Drift: ${HOST_DRIFT}s)"
+            echo " This will cause AWS Auth failures and TLS certificate errors."
+            echo " Please ensure your system time is set to update automatically."
+            echo "************************************************************************"
+            sleep 2
+        else
+            echo "    Host clock is sane (drift: ${HOST_DRIFT}s)."
         fi
     fi
 fi
 
 # 2. Ensure the container image exists
-# We use both 'image exists' (podman) and 'inspect' (docker/podman) for compatibility
+# We use både 'image exists' (podman) and 'inspect' (docker/podman) for compatibility
 if ! "$CONTAINER_ENGINE" inspect "$IMAGE_NAME" >/dev/null 2>&1; then
     echo "==> Container image $IMAGE_NAME not found. Building..."
     "$CONTAINER_ENGINE" build -t "$IMAGE_NAME" -f "$(dirname "$0")/nids-dev.Containerfile" "$(dirname "$0")"
