@@ -35,23 +35,34 @@ if [[ ! -f "$HOME/.ssh/id_ed25519.pub" && ! -f "$HOME/.ssh/id_rsa.pub" ]]; then
     echo ""
 fi
 
-# 4. Build Podman Image
+# 4. Build Container Image
 IMAGE_NAME="nids-dev:latest"
-echo "==> Building Podman image $IMAGE_NAME..."
+CONTAINER_ENGINE="${CONTAINER_ENGINE:-podman}"
+
+echo "==> Building container image $IMAGE_NAME using $CONTAINER_ENGINE..."
 echo "    (Note: This is also handled automatically by the one-shot scripts)"
-if ! command -v podman >/dev/null 2>&1; then
-    echo "ERROR: 'podman' not found. Please install Podman first."
+
+if ! command -v "$CONTAINER_ENGINE" >/dev/null 2>&1; then
+    echo "ERROR: '$CONTAINER_ENGINE' not found. Please install it first or set CONTAINER_ENGINE."
     exit 1
 fi
 
-podman build --platform "linux/$(podman info --format '{{.Host.Arch}}')" -t "$IMAGE_NAME" -f nids-dev.Containerfile .
+# Detect platform for native build
+if [[ "$CONTAINER_ENGINE" == "podman" ]]; then
+    PLATFORM="linux/$(podman info --format '{{.Host.Arch}}')"
+else
+    # Docker uses slightly different naming or we can just let it default to native
+    PLATFORM="linux/$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')"
+fi
+
+"$CONTAINER_ENGINE" build --platform "$PLATFORM" -t "$IMAGE_NAME" -f nids-dev.Containerfile .
 
 echo "------------------------------------------------------------"
 echo "==> Setup Complete!"
 echo "The NIDS development environment is containerized."
 echo ""
-echo "You can now run any deployment script directly from your host:"
-echo "    ./ocp-cluster-one-shot-4.21.sh"
+echo "You can now run the deployment script directly from your host:"
+echo "    ./ocp-cluster-one-shot.sh"
 echo ""
 echo "Everything (Kerberos, Image Build, AWS SAML) is handled automatically."
 echo "------------------------------------------------------------"

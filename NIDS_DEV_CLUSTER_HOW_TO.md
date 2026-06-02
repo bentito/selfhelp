@@ -8,18 +8,19 @@ Before running the automation scripts, ensure your laptop is ready:
 
 *   **VPN Connection:** You must be connected to the Red Hat corporate VPN to access the internal GitLab repository and Kerberos endpoints.
 *   **System Dependencies:** 
-    *   **Podman:** This is the primary requirement. All other tools (AWS CLI, OpenShift binaries, Python) are bundled in a container.
+    *   **Podman or Docker:** This is the primary requirement. All other tools (AWS CLI, OpenShift binaries, Python) are bundled in a container.
     *   **kinit:** Required on the host to request Kerberos tickets.
-        *   **Mac (Homebrew):** `brew install krb5 podman`
-        *   **Linux (Fedora/RHEL):** `sudo dnf install krb5-workstation podman`
+        *   **Mac (Homebrew):** `brew install krb5 podman` (or `docker`)
+        *   **Linux (Fedora/RHEL):** `sudo dnf install krb5-workstation podman` (or `docker`)
 *   **OpenShift Pull Secret:**
     *   Download your pull secret from [console.redhat.com](https://console.redhat.com/openshift/install/pull-secret).
     *   Save it exactly at: `~/.ocp-installer-pull-secret`
 *   **SSH Key:**
     *   Ensure you have a default SSH key generated. If you don't, run: `ssh-keygen -t ed25519`
-*   **Podman Time Synchronization:**
-    *   The AWS STS authentication process strictly requires accurate timestamps. If your laptop has recently slept or been suspended, the Podman VM's clock may drift.
-    *   **To fix this, always run:** `podman machine stop && podman machine start` before your first cluster deployment of the day.
+*   **Container VM Time Synchronization:**
+    *   The AWS STS authentication process strictly requires accurate timestamps. If your laptop has recently slept or been suspended, the container VM's clock may drift.
+    *   **Podman Users:** The script handles this automatically by syncing the clock using `date -s`. If it fails, run: `podman machine stop && podman machine start`.
+    *   **Docker Users:** Ensure your Docker Desktop clock is accurate (usually fixed by restarting Docker Desktop).
 
 ## 2. Bootstrapping the Environment
 
@@ -61,6 +62,7 @@ The deployment scripts rely on several environment variables. You must export th
 *   `AWS_PROFILE`: The local AWS profile name to configure (Defaults to `nids-dev`).
 *   `SAML_ROLE_NAME`: The AWS IAM role to request via SAML (Defaults to `admin`).
 *   `SSH_PUBKEY_PATH`: The path to the SSH public key for cluster access (Defaults to `~/.ssh/id_ed25519.pub`). *Note: Since the script runs in a container, the key must reside within your host's `~/.ssh` directory to be visible.*
+*   `CONTAINER_ENGINE`: Choose between `podman` and `docker` (Defaults to `podman`).
 
 ### Launching a Cluster
 
@@ -78,7 +80,7 @@ To deploy a specific version (e.g., **4.19**), pass it as the first argument:
 
 **What happens:**
 1.  **Auto-Detection:** The script detects it is running on the host and calls `./nids-run.sh`.
-2.  **Container Entry:** The container starts, mounting your host's Kerberos ticket, AWS config, and SSH keys. It also automatically ensures your Podman VM clock is synced to prevent AWS authentication errors.
+2.  **Container Entry:** The container starts, mounting your host's Kerberos ticket, AWS config, and SSH keys. If using Podman, it also automatically ensures your VM clock is synced to prevent AWS authentication errors.
 3.  **AWS Authentication:** The script (now inside the container) uses the host's ticket to refresh AWS credentials via `aws-saml.py`.
 4.  **Provisioning & Deployment:** The script uses the pre-installed Linux binaries to provision IAM roles and launch the cluster.
 
