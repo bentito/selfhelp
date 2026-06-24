@@ -60,7 +60,7 @@ The deployment scripts rely on several environment variables. You must export th
 *   `OCP_CLUSTER_NAME`: Override the auto-generated sequential cluster name.
 *   `KERBEROS_ID`: Your Red Hat Kerberos ID (Defaults to your system `$USER`).
 *   `AWS_PROFILE`: The local AWS profile name to configure (Defaults to `nids-dev`).
-*   `SAML_ROLE_NAME`: The AWS IAM role to request via SAML (Defaults to `admin`).
+*   `SAML_ROLE_NAME`: The AWS IAM role to request via SAML (Defaults to `${AWS_ACCOUNT_ID}-admin`).
 *   `SSH_PUBKEY_PATH`: The path to the SSH public key for cluster access (Defaults to `~/.ssh/id_ed25519.pub`). *Note: Since the script runs in a container, the key must reside within your host's `~/.ssh` directory to be visible.*
 *   `CONTAINER_ENGINE`: Choose between `podman` and `docker` (Defaults to `podman`).
 

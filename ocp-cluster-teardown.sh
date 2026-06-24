@@ -22,7 +22,7 @@ command -v openshift-install >/dev/null 2>&1 || die "openshift-install not found
 
 # 1) source AWS profile setup
 # shellcheck source=/dev/null
-export FRESH_SESSION="true"
+export FRESH_SESSION="${FRESH_SESSION:-false}"
 source "$AWS_ENV_SCRIPT"
 
 if [[ ! -d "$OCP_ASSET_DIR" ]]; then

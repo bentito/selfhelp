@@ -14,6 +14,8 @@ RUN dnf install -y \
     tar \
     gzip \
     unzip \
+    bind-utils \
+    sudo \
     && dnf clean all
 
 # Install AWS CLI v2 dynamically based on architecture
@@ -43,7 +45,8 @@ RUN HOST_ARCH=$(uname -m) && \
 RUN GIT_SSL_NO_VERIFY=true pip install --no-cache-dir git+https://gitlab.cee.redhat.com/compute/aws-automation.git
 
 # Setup developer user
-RUN useradd -u 1000 -m developer
+RUN useradd -u 1000 -m developer && \
+    echo "developer ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 USER developer
 WORKDIR /workspace
 

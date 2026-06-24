@@ -6,7 +6,7 @@
 PROFILE="${PROFILE:-nids-dev}"
 REGION="${REGION:-us-west-2}"
 KERBEROS_ID="${KERBEROS_ID:-$USER}"
-SAML_ROLE_NAME="admin"
+SAML_ROLE_NAME="${SAML_ROLE_NAME:-}"
 VENV_PATH="${VENV_PATH:-$HOME/.aws-saml-venv}"
 # -----------------
 
@@ -22,6 +22,14 @@ if [[ -z "${AWS_ACCOUNT_ID:-}" ]]; then
     echo "       Please ask the NIDS team for the AWS Account ID on Slack and export it:" >&2
     echo "       export AWS_ACCOUNT_ID=\"<account_id>\"" >&2
     return 1
+fi
+
+if [[ -z "${SAML_ROLE_NAME:-}" ]]; then
+    SAML_ROLE_NAME="admin"
+fi
+
+if [[ "${SAML_ROLE_NAME}" != "${AWS_ACCOUNT_ID}-"* ]]; then
+    SAML_ROLE_NAME="${AWS_ACCOUNT_ID}-${SAML_ROLE_NAME}"
 fi
 
 echo "==> clearing AWS_* env vars in this shell"

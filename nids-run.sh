@@ -87,6 +87,18 @@ if ! KRB5CCNAME="FILE:${KRB5_HOST_PATH}" klist -s 2>/dev/null; then
     kinit -c "FILE:${KRB5_HOST_PATH}" $KINIT_OPTS "${KERBEROS_ID:-${USER}}@IPA.REDHAT.COM" || exit 1
 fi
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -d "$HOME/.aws-saml-venv" && -f "$SCRIPT_DIR/redhat-aws.sh" ]]; then
+    echo "    Pre-fetching AWS credentials on host to cache service ticket..."
+    (
+        export FRESH_SESSION=true
+        export PROFILE="${AWS_PROFILE:-nids-dev}"
+        export VENV_PATH="${HOME}/.aws-saml-venv"
+        export KRB5CCNAME="FILE:${KRB5_HOST_PATH}"
+        source "$SCRIPT_DIR/redhat-aws.sh"
+    ) || echo "    WARNING: Host AWS refresh failed. Container will attempt it."
+fi
+
 # 4. Run the container
 
 # Linux-specific fixes for SELinux and file permissions
@@ -101,6 +113,21 @@ if [[ "$(uname)" == "Linux" ]]; then
     else
         # For Docker on Linux, we run as the current user to fix host file ownership
         EXTRA_FLAGS="--user $(id -u):$(id -g)"
+    fi
+fi
+
+SYNC_PID=""
+if [[ "$CONTAINER_ENGINE" == "podman" ]]; then
+    if podman machine list 2>/dev/null | grep -qE 'applehv|qemu|wsl|hyperv'; then
+        # Start a background clock sync loop to prevent AuthFailures during long waits
+        (
+            while true; do
+                sleep 60
+                HOST_TIME=$(date +%s)
+                podman machine ssh sudo date -s "@$HOST_TIME" >/dev/null 2>&1 || true
+            done
+        ) &
+        SYNC_PID=$!
     fi
 fi
 
@@ -119,3 +146,8 @@ fi
     -e OCP_BASE_DOMAIN="${OCP_BASE_DOMAIN:-}" \
     -e OCP_REGION="${OCP_REGION:-}" \
     "$IMAGE_NAME" "$@"
+
+if [[ -n "$SYNC_PID" ]]; then
+    kill "$SYNC_PID" 2>/dev/null || true
+fi
+

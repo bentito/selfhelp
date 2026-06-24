@@ -4,7 +4,33 @@ set -euo pipefail
 # --- Container Auto-Detection ---
 # If we are NOT in the container, re-exec via nids-run.sh
 if [[ ! -f /run/.containerenv && "${NIDS_CONTAINER:-}" != "true" ]]; then
-    echo "==> Host execution detected. Re-launching inside nids-dev container..."
+    echo "==> Host execution detected."
+    OCP_BASE_DOMAIN="${OCP_BASE_DOMAIN:-nids-dev.devcluster.openshift.com}"
+    KNOWN_NS_IP="205.251.196.100"
+
+    # Configure Host Split DNS to bypass broken parent delegation
+    if [[ "$(uname)" == "Darwin" ]]; then
+        if [[ ! -f "/etc/resolver/$OCP_BASE_DOMAIN" ]]; then
+            echo "==> Applying macOS split DNS to fix devcluster resolution. (Requires sudo)"
+            sudo mkdir -p /etc/resolver
+            echo "nameserver $KNOWN_NS_IP" | sudo tee "/etc/resolver/$OCP_BASE_DOMAIN" >/dev/null
+        fi
+    elif [[ "$(uname)" == "Linux" ]]; then
+        if command -v resolvectl >/dev/null 2>&1; then
+            if ! resolvectl status 2>/dev/null | grep -q "$OCP_BASE_DOMAIN"; then
+                echo "==> Applying systemd-resolved split DNS to fix devcluster resolution. (Requires sudo)"
+                sudo mkdir -p /etc/systemd/resolved.conf.d
+                cat <<EOF | sudo tee "/etc/systemd/resolved.conf.d/$OCP_BASE_DOMAIN.conf" >/dev/null
+[Resolve]
+DNS=$KNOWN_NS_IP
+Domains=~$OCP_BASE_DOMAIN
+EOF
+                sudo systemctl restart systemd-resolved
+            fi
+        fi
+    fi
+
+    echo "==> Re-launching inside nids-dev container..."
     # We use ./basename to ensure the container looks in /workspace
     exec "$(dirname "$0")/nids-run.sh" "./$(basename "$0")" "$@"
 fi
@@ -81,7 +107,7 @@ command -v openshift-install >/dev/null 2>&1 || die "openshift-install not found
 
 # 1) source AWS profile setup
 # shellcheck source=/dev/null
-export FRESH_SESSION="true"
+export FRESH_SESSION="${FRESH_SESSION:-false}"
 source "$AWS_ENV_SCRIPT"
 
 # Force x86_64 release payload (prevents ARM64 installer from defaulting to Graviton)
@@ -112,6 +138,26 @@ if [[ "$ZONE_ID" != "None" && "$ZONE_ID" != "null" ]]; then
     echo "INFO: Route53 records in $OCP_BASE_DOMAIN: $RECORD_COUNT"
     if (( RECORD_COUNT > 9800 )); then
         echo "CRITICAL WARNING: Route53 record count is at $RECORD_COUNT (Limit 10,000). Delete old clusters!"
+    fi
+
+    # Inject authoritative NS into container DNS to completely bypass broken public parent delegation
+    MY_NS=$(aws route53 list-resource-record-sets --hosted-zone-id "$ZONE_ID" --query "ResourceRecordSets[?Type=='NS'].ResourceRecords[0].Value" --output text 2>/dev/null | head -n1)
+    if [[ -n "$MY_NS" ]]; then
+        MY_NS_IP=$(python3 -c "import socket, sys; print(socket.gethostbyname(sys.argv[1].rstrip('.')))" "$MY_NS" 2>/dev/null || echo "")
+        if [[ -n "$MY_NS_IP" ]]; then
+            echo "==> Configuring dnsmasq to bypass broken parent delegation for $OCP_BASE_DOMAIN..."
+            sudo dnf install -y dnsmasq >/dev/null 2>&1 || true
+            grep nameserver /etc/resolv.conf | grep -v "127.0.0.1" | sudo tee /etc/resolv.dnsmasq >/dev/null
+            cat <<EOF | sudo tee /etc/dnsmasq.conf >/dev/null
+resolv-file=/etc/resolv.dnsmasq
+server=/$OCP_BASE_DOMAIN/$MY_NS_IP
+listen-address=127.0.0.1
+bind-interfaces
+EOF
+            sudo pkill dnsmasq 2>/dev/null || true
+            sudo dnsmasq
+            echo "nameserver 127.0.0.1" | sudo tee /etc/resolv.conf >/dev/null
+        fi
     fi
 else
     echo "WARNING: Could not find Route53 zone for $OCP_BASE_DOMAIN. DNS verification may fail."
