@@ -1,2 +1,3 @@
 .aws-saml-venv/
 *.bak
+scratch/
