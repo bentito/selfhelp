@@ -1,0 +1,29 @@
+{
+  "category_1_core": [
+    "openshift/cluster-ingress-operator",
+    "openshift/router",
+    "openshift/cluster-dns-operator",
+    "openshift/coredns",
+    "openshift/coredns-ocp-dnsnameresolver",
+    "openshift/external-dns-operator",
+    "openshift/external-dns",
+    "openshift/aws-load-balancer-operator",
+    "openshift/route-controller-manager",
+    "openshift/network-edge-tools"
+  ],
+  "category_2_shared": [
+    "openshift/api",
+    "openshift/library-go",
+    "openshift/origin",
+    "openshift/release",
+    "openshift/images",
+    "openshift/enhancements",
+    "openshift/openshift-docs",
+    "openshift/openshift-tests-private",
+    "openshift/machine-api-operator",
+    "openshift/cluster-monitoring-operator",
+    "openshift/golang-crypto",
+    "openshift/golang-oauth2",
+    "openshift/cloud-provider-gcp"
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "organizations": "openshift",
+  "team_members": [
+    { "github": "knobunc", "name": "Ben Bennett" },
+    { "github": "Miciah", "name": "Miciah Masters" },
+    { "github": "frobware", "name": "Andy McDermott" },
+    { "github": "candita", "name": "Candace Holman" },
+    { "github": "rfredette", "name": "Ryan Fredette" },
+    { "github": "alebedev87", "name": "Andrey Lebedev" },
+    { "github": "miheer", "name": "Miheer Salunke" },
+    { "github": "gcs278", "name": "Grant Spence" },
+    { "github": "Thealisyed", "name": "Ali Syed" },
+    { "github": "grzpiotrowski", "name": "Grzegorz Piotrowski" },
+    { "github": "rikatz", "name": "Ricardo Pchevuzinske Katz" },
+    { "github": "davidesalerno", "name": "Davide Salerno" },
+    { "github": "bentito", "name": "Brett Tofel" },
+    { "github": "jcmoraisjr", "name": "Joao Morais" },
+    { "github": "aswinsuryan", "name": "Aswin Suryanarayanan" }
+  ]
+}
