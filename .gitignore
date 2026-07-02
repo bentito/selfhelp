@@ -1,3 +1,5 @@
 .aws-saml-venv/
 *.bak
 scratch/
+nid-ai-bot-info.txt
+nids-ai.2026-06-30.private-key.pem

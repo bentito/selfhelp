@@ -270,5 +270,8 @@ else
     fi
 fi
 
-echo "==> launching openshift-install create cluster (phase 2) with dir=$OCP_ASSET_DIR"
+echo "==> 6. creating ignition configs (phase 2) in $OCP_ASSET_DIR"
+openshift-install create ignition-configs --dir "$OCP_ASSET_DIR" --log-level=info
+
+echo "==> launching openshift-install create cluster (phase 3) with dir=$OCP_ASSET_DIR"
 openshift-install create cluster --dir "$OCP_ASSET_DIR" --log-level=info
