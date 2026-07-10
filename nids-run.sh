@@ -64,7 +64,10 @@ fi
 # We use både 'image exists' (podman) and 'inspect' (docker/podman) for compatibility
 if ! "$CONTAINER_ENGINE" inspect "$IMAGE_NAME" >/dev/null 2>&1; then
     echo "==> Container image $IMAGE_NAME not found. Building..."
-    "$CONTAINER_ENGINE" build -t "$IMAGE_NAME" -f "$(dirname "$0")/nids-dev.Containerfile" "$(dirname "$0")"
+    "$CONTAINER_ENGINE" build -t "$IMAGE_NAME" \
+        ${OCP_MIRROR_PATH:+--build-arg "OCP_MIRROR_PATH=${OCP_MIRROR_PATH}"} \
+        ${OCP_BIN_VERSION:+--build-arg "OCP_BIN_VERSION=${OCP_BIN_VERSION}"} \
+        -f "$(dirname "$0")/nids-dev.Containerfile" "$(dirname "$0")"
 fi
 
 # 3. Ensure Kerberos ticket is available in FILE format on host

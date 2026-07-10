@@ -30,6 +30,15 @@ EOF
         fi
     fi
 
+    # Set container build args based on requested version
+    HOST_OCP_VERSION="${1:-4.21}"
+    case "$HOST_OCP_VERSION" in
+        5.0)
+            export OCP_MIRROR_PATH=ocp-dev-preview/candidate-5.0
+            export OCP_BIN_VERSION=5.0.0-ec.3
+            ;;
+    esac
+
     echo "==> Re-launching inside nids-dev container..."
     # We use ./basename to ensure the container looks in /workspace
     exec "$(dirname "$0")/nids-run.sh" "./$(basename "$0")" "$@"
@@ -47,6 +56,9 @@ case "$OCP_VERSION" in
         ;;
     4.21)
         RELEASE_IMAGE="quay.io/openshift-release-dev/ocp-release:4.21.10-x86_64"
+        ;;
+    5.0)
+        RELEASE_IMAGE="quay.io/openshift-release-dev/ocp-release:5.0.0-ec.3-x86_64"
         ;;
     *)
         # Handle full versions like 4.21.10

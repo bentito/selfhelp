@@ -31,14 +31,14 @@ RUN HOST_ARCH=$(uname -m) && \
     rm -rf awscliv2.zip ./aws
 
 # Install OpenShift Binaries (oc, openshift-install, ccoctl)
-# Note: We use 4.21.10 as the baseline. We detect and normalize arch for mirror paths.
+ARG OCP_MIRROR_PATH=ocp/4.21.10
+ARG OCP_BIN_VERSION=4.21.10
 RUN HOST_ARCH=$(uname -m) && \
     if [ "$HOST_ARCH" == "aarch64" ]; then MIRROR_ARCH="aarch64"; else MIRROR_ARCH="x86_64"; fi && \
     mkdir -p /usr/local/bin && \
-    curl -L https://mirror.openshift.com/pub/openshift-v4/${MIRROR_ARCH}/clients/ocp/4.21.10/openshift-install-linux-4.21.10.tar.gz | tar -xz -C /usr/local/bin openshift-install && \
-    curl -L https://mirror.openshift.com/pub/openshift-v4/${MIRROR_ARCH}/clients/ocp/4.21.10/openshift-client-linux-4.21.10.tar.gz | tar -xz -C /usr/local/bin oc && \
-    curl -L https://mirror.openshift.com/pub/openshift-v4/${MIRROR_ARCH}/clients/ocp/4.21.10/ccoctl-linux-4.21.10.tar.gz | tar -xz -C /usr/local/bin ccoctl && \
-    ln -s /usr/local/bin/openshift-install /usr/local/bin/openshift-install-4.21
+    curl -L https://mirror.openshift.com/pub/openshift-v4/${MIRROR_ARCH}/clients/${OCP_MIRROR_PATH}/openshift-install-linux-${OCP_BIN_VERSION}.tar.gz | tar -xz -C /usr/local/bin openshift-install && \
+    curl -L https://mirror.openshift.com/pub/openshift-v4/${MIRROR_ARCH}/clients/${OCP_MIRROR_PATH}/openshift-client-linux-${OCP_BIN_VERSION}.tar.gz | tar -xz -C /usr/local/bin oc && \
+    curl -L https://mirror.openshift.com/pub/openshift-v4/${MIRROR_ARCH}/clients/${OCP_MIRROR_PATH}/ccoctl-linux-${OCP_BIN_VERSION}.tar.gz | tar -xz -C /usr/local/bin ccoctl
 
 # Install internal Red Hat SAML tool
 # We use the same GIT_SSL_NO_VERIFY trick as the setup.sh
