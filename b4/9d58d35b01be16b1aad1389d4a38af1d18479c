@@ -1,0 +1,23 @@
+NIDS_DEV_CLUSTER_HOW_TO.md
+  s_4de8959624635f::t_eda81131afb900 83-84
+nids-run.sh
+  s_4de8959624635f::t_ae5fbf55e6b38b 69-74,79
+ocp-cluster-one-shot.sh
+  s_4de8959624635f::t_28742b5531dfa8 61-62,92-95
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "b49d58d35b01be16b1aad1389d4a38af1d18479c",
+  "prompts": {},
+  "sessions": {
+    "s_4de8959624635f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a11383-22de-7a81-84af-564115af0f79",
+        "model": "unknown"
+      },
+      "human_author": "Brett Tofel <btofel@redhat.com>"
+    }
+  }
+}
