@@ -4,7 +4,9 @@ set -euo pipefail
 # NIDS Container Wrapper
 # This script runs the nids-dev container with all necessary mounts and environment variables.
 
-IMAGE_NAME="nids-dev:latest"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONTAINERFILE_CHECKSUM=$(cksum < "$SCRIPT_DIR/nids-dev.Containerfile" | awk '{print $1}')
+IMAGE_NAME="nids-dev:${OCP_BIN_VERSION:-4.21.10}-${CONTAINERFILE_CHECKSUM}"
 CONTAINER_ENGINE="${CONTAINER_ENGINE:-podman}"
 HOST_UID=$(id -u)
 KRB5_HOST_PATH="${HOME}/.krb5cc_nids"
@@ -64,10 +66,10 @@ fi
 # We use både 'image exists' (podman) and 'inspect' (docker/podman) for compatibility
 if ! "$CONTAINER_ENGINE" inspect "$IMAGE_NAME" >/dev/null 2>&1; then
     echo "==> Container image $IMAGE_NAME not found. Building..."
-    "$CONTAINER_ENGINE" build -t "$IMAGE_NAME" \
+    "$CONTAINER_ENGINE" build -t "$IMAGE_NAME" -t nids-dev:latest \
         ${OCP_MIRROR_PATH:+--build-arg "OCP_MIRROR_PATH=${OCP_MIRROR_PATH}"} \
         ${OCP_BIN_VERSION:+--build-arg "OCP_BIN_VERSION=${OCP_BIN_VERSION}"} \
-        -f "$(dirname "$0")/nids-dev.Containerfile" "$(dirname "$0")"
+        -f "$SCRIPT_DIR/nids-dev.Containerfile" "$SCRIPT_DIR"
 fi
 
 # 3. Ensure Kerberos ticket is available in FILE format on host
@@ -90,7 +92,6 @@ if ! KRB5CCNAME="FILE:${KRB5_HOST_PATH}" klist -s 2>/dev/null; then
     kinit -c "FILE:${KRB5_HOST_PATH}" $KINIT_OPTS "${KERBEROS_ID:-${USER}}@IPA.REDHAT.COM" || exit 1
 fi
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [[ -d "$HOME/.aws-saml-venv" && -f "$SCRIPT_DIR/redhat-aws.sh" ]]; then
     echo "    Pre-fetching AWS credentials on host to cache service ticket..."
     (
@@ -153,4 +154,3 @@ fi
 if [[ -n "$SYNC_PID" ]]; then
     kill "$SYNC_PID" 2>/dev/null || true
 fi
-

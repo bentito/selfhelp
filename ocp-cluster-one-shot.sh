@@ -33,9 +33,23 @@ EOF
     # Set container build args based on requested version
     HOST_OCP_VERSION="${1:-4.21}"
     case "$HOST_OCP_VERSION" in
+        4.19)
+            export OCP_MIRROR_PATH=ocp/4.19.12
+            export OCP_BIN_VERSION=4.19.12
+            ;;
+        4.21)
+            export OCP_MIRROR_PATH=ocp/4.21.10
+            export OCP_BIN_VERSION=4.21.10
+            ;;
         5.0)
             export OCP_MIRROR_PATH=ocp-dev-preview/candidate-5.0
             export OCP_BIN_VERSION=5.0.0-ec.3
+            ;;
+        *)
+            if [[ "$HOST_OCP_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                export OCP_MIRROR_PATH="ocp/$HOST_OCP_VERSION"
+                export OCP_BIN_VERSION="$HOST_OCP_VERSION"
+            fi
             ;;
     esac
 
@@ -62,7 +76,7 @@ case "$OCP_VERSION" in
         ;;
     *)
         # Handle full versions like 4.21.10
-        if [[ "$OCP_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+        if [[ "$OCP_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
              RELEASE_IMAGE="quay.io/openshift-release-dev/ocp-release:${OCP_VERSION}-x86_64"
         else
              echo "ERROR: Unsupported version: $OCP_VERSION. Use '4.19', '4.21', or a full tag like '4.21.10'." >&2
@@ -158,7 +172,8 @@ if [[ "$ZONE_ID" != "None" && "$ZONE_ID" != "null" ]]; then
         MY_NS_IP=$(python3 -c "import socket, sys; print(socket.gethostbyname(sys.argv[1].rstrip('.')))" "$MY_NS" 2>/dev/null || echo "")
         if [[ -n "$MY_NS_IP" ]]; then
             echo "==> Configuring dnsmasq to bypass broken parent delegation for $OCP_BASE_DOMAIN..."
-            sudo dnf install -y dnsmasq >/dev/null 2>&1 || true
+            command -v sudo >/dev/null 2>&1 || die "sudo is missing from the container image; rebuild it with ./nids-run.sh"
+            command -v dnsmasq >/dev/null 2>&1 || die "dnsmasq is missing from the container image; rebuild it with ./nids-run.sh"
             grep nameserver /etc/resolv.conf | grep -v "127.0.0.1" | sudo tee /etc/resolv.dnsmasq >/dev/null
             cat <<EOF | sudo tee /etc/dnsmasq.conf >/dev/null
 resolv-file=/etc/resolv.dnsmasq

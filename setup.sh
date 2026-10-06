@@ -36,7 +36,9 @@ if [[ ! -f "$HOME/.ssh/id_ed25519.pub" && ! -f "$HOME/.ssh/id_rsa.pub" ]]; then
 fi
 
 # 4. Build Container Image
-IMAGE_NAME="nids-dev:latest"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONTAINERFILE_CHECKSUM=$(cksum < "$SCRIPT_DIR/nids-dev.Containerfile" | awk '{print $1}')
+IMAGE_NAME="nids-dev:4.21.10-${CONTAINERFILE_CHECKSUM}"
 CONTAINER_ENGINE="${CONTAINER_ENGINE:-podman}"
 
 echo "==> Building container image $IMAGE_NAME using $CONTAINER_ENGINE..."
@@ -55,7 +57,7 @@ else
     PLATFORM="linux/$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')"
 fi
 
-"$CONTAINER_ENGINE" build --platform "$PLATFORM" -t "$IMAGE_NAME" -f nids-dev.Containerfile .
+"$CONTAINER_ENGINE" build --platform "$PLATFORM" -t "$IMAGE_NAME" -t nids-dev:latest -f "$SCRIPT_DIR/nids-dev.Containerfile" "$SCRIPT_DIR"
 
 echo "------------------------------------------------------------"
 echo "==> Setup Complete!"

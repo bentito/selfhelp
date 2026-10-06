@@ -15,6 +15,7 @@ RUN dnf install -y \
     gzip \
     unzip \
     bind-utils \
+    dnsmasq \
     sudo \
     && dnf clean all
 
