@@ -66,11 +66,17 @@ fi
 # We use både 'image exists' (podman) and 'inspect' (docker/podman) for compatibility
 if ! "$CONTAINER_ENGINE" inspect "$IMAGE_NAME" >/dev/null 2>&1; then
     echo "==> Container image $IMAGE_NAME not found. Building..."
-    "$CONTAINER_ENGINE" build -t "$IMAGE_NAME" -t nids-dev:latest \
+    if [[ "$CONTAINER_ENGINE" == "podman" ]]; then
+        PLATFORM="linux/$(podman info --format '{{.Host.Arch}}')"
+    else
+        PLATFORM="linux/$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')"
+    fi
+    "$CONTAINER_ENGINE" build --platform "$PLATFORM" -t "$IMAGE_NAME" -t nids-dev:latest \
         ${OCP_MIRROR_PATH:+--build-arg "OCP_MIRROR_PATH=${OCP_MIRROR_PATH}"} \
         ${OCP_BIN_VERSION:+--build-arg "OCP_BIN_VERSION=${OCP_BIN_VERSION}"} \
         -f "$SCRIPT_DIR/nids-dev.Containerfile" "$SCRIPT_DIR"
 fi
+echo "==> Using container image $IMAGE_NAME"
 
 # 3. Ensure Kerberos ticket is available in FILE format on host
 # Macs and some Linux distros use non-file caches (API/KCM) by default.

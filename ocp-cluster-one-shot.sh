@@ -58,6 +58,8 @@ EOF
     exec "$(dirname "$0")/nids-run.sh" "./$(basename "$0")" "$@"
 fi
 
+die() { echo "ERROR: $*" >&2; exit 1; }
+
 # --- Version Selection ---
 # Default to 4.21 if no version is provided
 OCP_VERSION="${1:-4.21}"
@@ -86,6 +88,10 @@ case "$OCP_VERSION" in
 esac
 
 echo "==> Preparing to deploy OpenShift $OCP_VERSION using payload: $RELEASE_IMAGE"
+
+if ! command -v sudo >/dev/null 2>&1 || ! command -v dnsmasq >/dev/null 2>&1; then
+    die "This container is missing sudo or dnsmasq. Exit it and run ./ocp-cluster-one-shot.sh $OCP_VERSION from the host shell to build the current image."
+fi
 
 # --- user-tunable settings (use OCP_* to avoid clashes with AWS_* cleanup) ---
 OCP_BASE_DOMAIN="${OCP_BASE_DOMAIN:-nids-dev.devcluster.openshift.com}"
@@ -121,8 +127,6 @@ SSH_PUBKEY_PATH="${SSH_PUBKEY_PATH:-$HOME/.ssh/id_ed25519.pub}"
 
 # aws environment bootstrapper
 AWS_ENV_SCRIPT="${AWS_ENV_SCRIPT:-$(dirname "$0")/redhat-aws.sh}"
-
-die() { echo "ERROR: $*" >&2; exit 1; }
 
 # sanity checks
 command -v aws >/dev/null 2>&1 || die "aws cli not found in PATH"
@@ -172,8 +176,6 @@ if [[ "$ZONE_ID" != "None" && "$ZONE_ID" != "null" ]]; then
         MY_NS_IP=$(python3 -c "import socket, sys; print(socket.gethostbyname(sys.argv[1].rstrip('.')))" "$MY_NS" 2>/dev/null || echo "")
         if [[ -n "$MY_NS_IP" ]]; then
             echo "==> Configuring dnsmasq to bypass broken parent delegation for $OCP_BASE_DOMAIN..."
-            command -v sudo >/dev/null 2>&1 || die "sudo is missing from the container image; rebuild it with ./nids-run.sh"
-            command -v dnsmasq >/dev/null 2>&1 || die "dnsmasq is missing from the container image; rebuild it with ./nids-run.sh"
             grep nameserver /etc/resolv.conf | grep -v "127.0.0.1" | sudo tee /etc/resolv.dnsmasq >/dev/null
             cat <<EOF | sudo tee /etc/dnsmasq.conf >/dev/null
 resolv-file=/etc/resolv.dnsmasq

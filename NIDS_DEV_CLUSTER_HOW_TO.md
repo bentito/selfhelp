@@ -80,6 +80,8 @@ To deploy a specific version (e.g., **4.19**), pass it as the first argument:
 
 You can also select an exact z-stream release, such as `./ocp-cluster-one-shot.sh 4.22.17`. The wrapper builds a container with matching OpenShift tools when that version or the Containerfile has changed. The image includes `sudo` and `dnsmasq` for the container DNS setup.
 
+Run the one-shot command from the host shell. If you are already inside an older `nids-dev` container, exit it first so the wrapper can select or build the current image.
+
 **What happens:**
 1.  **Auto-Detection:** The script detects it is running on the host and calls `./nids-run.sh`.
 2.  **Container Entry:** The container starts, mounting your host's Kerberos ticket, AWS config, and SSH keys. If using Podman, it also automatically ensures your VM clock is synced to prevent AWS authentication errors.
