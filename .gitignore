@@ -3,3 +3,7 @@
 scratch/
 nid-ai-bot-info.txt
 nids-ai.2026-06-30.private-key.pem
+# Retain local state from developer clusters created before the migration.
+/ocp-install-dir/
+/.ocp_cluster_counter
+/.krb-passwd
