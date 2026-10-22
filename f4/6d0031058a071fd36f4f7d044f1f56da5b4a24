@@ -1,0 +1,21 @@
+.gitignore
+  s_a73ed46393897b::t_e46dbf9187bc61 6-9
+README.md
+  s_a73ed46393897b::t_5f3aa2a2c357c0 1-19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "f46d0031058a071fd36f4f7d044f1f56da5b4a24",
+  "prompts": {},
+  "sessions": {
+    "s_a73ed46393897b": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a16492-87e4-76e3-a2e5-370ef4d86cfe",
+        "model": "unknown"
+      },
+      "human_author": "Brett Tofel <btofel@redhat.com>"
+    }
+  }
+}
